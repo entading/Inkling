@@ -11,6 +11,18 @@ function isBoard(value: string): value is Board {
   return (BOARDS as string[]).includes(value)
 }
 
+/** 拒绝路径穿越与分隔符，slug 必须是一段安全的文件名（不含扩展名） */
+function isSafeSlug(value: string): boolean {
+  return (
+    value.length > 0 &&
+    value !== '.' &&
+    value !== '..' &&
+    !value.includes('/') &&
+    !value.includes('\\') &&
+    !value.includes('\0')
+  )
+}
+
 /** 词汇按字母序（title），其余按 updated 倒序 */
 function sortNotes(board: Board) {
   const notes = listNotes(board)
@@ -35,6 +47,9 @@ export function registerRoutes(app: FastifyInstance): void {
     const { board, slug } = req.params as { board: string; slug: string }
     if (!isBoard(board)) {
       return reply.code(404).send({ error: `板块不存在：${board}` })
+    }
+    if (!isSafeSlug(slug)) {
+      return reply.code(404).send({ error: `词条不存在：${board}/${slug}` })
     }
     const note = getNote(board, slug)
     if (!note) {

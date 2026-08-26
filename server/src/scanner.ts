@@ -2,18 +2,33 @@ import fs from 'node:fs'
 import path from 'node:path'
 import matter from 'gray-matter'
 import chokidar, { type FSWatcher } from 'chokidar'
-import { BOARD_LABELS, BOARDS, type Board, type Note, type NoteWithBody } from './types.js'
+import {
+  BOARD_LABELS,
+  BOARDS,
+  type Board,
+  type Note,
+  type NotePublic,
+  type NoteWithBody,
+} from './types.js'
 
 export const NOTES_DIR = path.resolve(import.meta.dirname, '../../notes')
 
 /** 内存索引：板块 -> slug -> 词条 */
 const index = new Map<Board, Map<string, Note>>()
 
-/** 统一按 UTC 组件输出 YYYY-MM-DD（YAML 裸日期解析为 UTC 午夜 Date） */
-function dateOf(d: Date): string {
+/** 日期值（YAML 裸日期是 UTC 午夜 Date）按 UTC 组件输出，还原用户所写日期 */
+function dateOfUtc(d: Date): string {
   const y = d.getUTCFullYear()
   const m = String(d.getUTCMonth() + 1).padStart(2, '0')
   const day = String(d.getUTCDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** 文件系统时间（本地时刻）按本地组件输出，避免 UTC+8 凌晨回退偏一天 */
+function dateOfLocal(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
 }
 
@@ -40,6 +55,7 @@ function parseNote(filePath: string): Note | null {
   const note: Note = {
     board,
     slug,
+    filePath: path.relative(NOTES_DIR, filePath),
     title: typeof data.data.title === 'string' && data.data.title.trim() ? data.data.title.trim() : slug,
     tags: Array.isArray(data.data.tags) ? data.data.tags.map(String) : [],
     created: createDateStr(data.data.created, created),
@@ -54,11 +70,18 @@ function parseNote(filePath: string): Note | null {
 function createDateStr(value: unknown, fallback: Date): string {
   const d =
     typeof value === 'string' ? new Date(value) : value instanceof Date ? value : null
-  if (d && !Number.isNaN(d.getTime())) return dateOf(d)
-  return dateOf(fallback)
+  if (d && !Number.isNaN(d.getTime())) return dateOfUtc(d)
+  return dateOfLocal(fallback)
 }
 
 function upsert(filePath: string): void {
+  let stat: fs.Stats
+  try {
+    stat = fs.statSync(filePath)
+  } catch {
+    return // 事件竞态：文件已被删除
+  }
+  if (!stat.isFile() || !filePath.endsWith('.md')) return
   const note = parseNote(filePath)
   if (!note) return
   let slugMap = index.get(note.board)
@@ -79,23 +102,26 @@ function remove(filePath: string): void {
   if (!fs.existsSync(filePath)) slugMap.delete(slug)
 }
 
+/** 递归收集板块目录下所有 .md（与 chokidar 的递归监听行为一致） */
+function scanDir(dir: string, slugMap: Map<string, Note>): void {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const filePath = path.join(dir, entry.name)
+    if (entry.isDirectory()) {
+      scanDir(filePath, slugMap)
+    } else if (entry.isFile() && entry.name.endsWith('.md')) {
+      const note = parseNote(filePath)
+      if (note) slugMap.set(note.slug, note)
+    }
+  }
+}
+
 /** 启动时全量扫描 */
 export function scanAll(): void {
   for (const board of BOARDS) {
     const dir = path.join(NOTES_DIR, board)
-    if (!fs.existsSync(dir)) {
-      index.set(board, new Map())
-      continue
-    }
     const slugMap = new Map<string, Note>()
     index.set(board, slugMap)
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const filePath = path.join(dir, entry.name)
-      if (entry.isFile() && entry.name.endsWith('.md')) {
-        const note = parseNote(filePath)
-        if (note) slugMap.set(note.slug, note)
-      }
-    }
+    if (fs.existsSync(dir)) scanDir(dir, slugMap)
   }
 }
 
@@ -114,16 +140,21 @@ export function watch(delayMs = 150): FSWatcher {
   return watcher
 }
 
+/** 剥离内部字段（filePath），得到对外 API 形态 */
+function toPublic(note: Note): NotePublic {
+  const { filePath: _filePath, ...pub } = note
+  return pub
+}
+
 export function getNote(board: Board, slug: string): NoteWithBody | null {
   const note = index.get(board)?.get(slug)
   if (!note) return null
-  const filePath = path.join(NOTES_DIR, board, `${slug}.md`)
-  const raw = fs.readFileSync(filePath, 'utf-8')
-  return { ...note, body: matter(raw).content }
+  const raw = fs.readFileSync(path.join(NOTES_DIR, note.filePath), 'utf-8')
+  return { ...toPublic(note), body: matter(raw).content }
 }
 
-export function listNotes(board: Board): Note[] {
-  return [...(index.get(board)?.values() ?? [])]
+export function listNotes(board: Board): NotePublic[] {
+  return [...(index.get(board)?.values() ?? [])].map(toPublic)
 }
 
 export function boardCounts(): Array<{ board: Board; label: string; count: number }> {
@@ -134,6 +165,6 @@ export function boardCounts(): Array<{ board: Board; label: string; count: numbe
   }))
 }
 
-export function allNotes(): Note[] {
-  return BOARDS.flatMap((board) => [...(index.get(board)?.values() ?? [])])
+export function allNotes(): NotePublic[] {
+  return BOARDS.flatMap((board) => [...(index.get(board)?.values() ?? [])]).map(toPublic)
 }
