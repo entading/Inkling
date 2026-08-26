@@ -5,6 +5,8 @@ export interface Note {
   board: Board
   /** 文件名（不含扩展名），板块内唯一 */
   slug: string
+  /** 相对 notes/ 的路径（含可能的子目录），仅服务端内部使用，API 响应中剥离 */
+  filePath: string
   /** 显示标题，无 frontmatter 时以文件名兜底 */
   title: string
   /** IPA 音标（可选） */
@@ -19,8 +21,11 @@ export interface Note {
   updated: string
 }
 
+/** API 对外形态：不含服务端内部字段（filePath） */
+export type NotePublic = Omit<Note, 'filePath'>
+
 /** 单条词条：frontmatter 元数据 + 正文 */
-export interface NoteWithBody extends Note {
+export interface NoteWithBody extends NotePublic {
   /** 正文（不含 frontmatter） */
   body: string
 }
