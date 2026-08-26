@@ -1,0 +1,17 @@
+{
+  "name": "en_tool",
+  "version": "0.1.0",
+  "private": true,
+  "description": "个人英语学习知识沉淀库：Markdown 文件即数据，检索快、可互联",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,web -c blue,green \"npm run dev -w server\" \"npm run dev -w web\"",
+    "build": "npm run build -w server && npm run build -w web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
