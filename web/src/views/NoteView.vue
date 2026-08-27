@@ -236,4 +236,29 @@ watch(() => route.params, load)
   border-top: 1px solid var(--color-border);
   margin: var(--space-5) 0;
 }
+
+@media (max-width: 767px) {
+  .note {
+    padding: 20px;
+  }
+
+  .note-title {
+    font-size: 1.4rem;
+  }
+
+  .note-meta {
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-5);
+  }
+
+  .note-body {
+    font-size: 0.95rem;
+  }
+
+  /* 宽表格在窄屏转为块级滚动容器，避免横向撑破页面 */
+  .note-body :deep(table) {
+    display: block;
+    overflow-x: auto;
+  }
+}
 </style>

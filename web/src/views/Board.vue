@@ -216,4 +216,20 @@ watch(() => route.query, syncFromRoute)
 .error {
   color: var(--color-danger);
 }
+
+@media (max-width: 767px) {
+  .board-header {
+    flex-direction: column;
+    gap: var(--space-1);
+    margin-bottom: var(--space-3);
+  }
+
+  .board-search {
+    margin-bottom: var(--space-4);
+  }
+
+  .board-search-input {
+    padding: 9px 42px 9px 34px;
+  }
+}
 </style>

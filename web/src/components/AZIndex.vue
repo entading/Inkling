@@ -126,4 +126,36 @@ function scrollTo(key: string) {
   font-weight: 600;
   color: var(--color-accent);
 }
+
+@media (max-width: 767px) {
+  /* 移动端：竖排索引改为列表顶部横向滚动字母条（类似手机通讯录，设计 3.3） */
+  .az {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .az-rail {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    /* 覆盖桌面 align-self:flex-start：竖排改横排后必须撑满容器宽度才能内部滚动 */
+    align-self: stretch;
+    flex-direction: row;
+    padding: var(--space-2) var(--space-1);
+    margin-bottom: var(--space-4);
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg);
+  }
+
+  .az-letter {
+    flex: none;
+  }
+
+  /* 横向字母条 sticky 在顶部，滚动定位时给分组标题留出不被遮挡的余量 */
+  .az-group {
+    scroll-margin-top: 44px;
+  }
+}
 </style>

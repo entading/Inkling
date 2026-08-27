@@ -118,4 +118,17 @@ defineProps<{ notes: NoteMeta[] }>()
   text-align: center;
   padding: var(--space-7) 0;
 }
+
+@media (max-width: 767px) {
+  /* 窄屏侧栏行内容放不下时允许换行：标题一行，板块/标签/日期换行排 */
+  .note-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-2) var(--space-4);
+  }
+
+  .row-side {
+    flex-wrap: wrap;
+  }
+}
 </style>

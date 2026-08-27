@@ -4,6 +4,7 @@ import Board from './views/Board.vue'
 import NoteView from './views/NoteView.vue'
 import Tags from './views/Tags.vue'
 import TagDetail from './views/TagDetail.vue'
+import Settings from './views/Settings.vue'
 import NotFound from './views/NotFound.vue'
 import type { Board as BoardName } from './api'
 
@@ -27,6 +28,7 @@ const router = createRouter({
     { path: '/v/:board/:slug', name: 'note', component: NoteView },
     { path: '/tags', name: 'tags', component: Tags },
     { path: '/tags/:tag', name: 'tag-detail', component: TagDetail },
+    { path: '/settings', name: 'settings', component: Settings },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFound },
   ],
 })

@@ -7,6 +7,12 @@ import {
   allNotes,
   allNotesWithBody,
 } from './scanner.js'
+import { LAN_STATE, buildServerInfo } from './settings.js'
+
+/** 由 index.ts 注入：请求切换局域网监听（后台执行，先应答后 close→re-listen） */
+export interface ServerHooks {
+  toggleLan: (enabled: boolean) => void
+}
 
 function isBoard(value: string): value is Board {
   return (BOARDS as string[]).includes(value)
@@ -33,7 +39,7 @@ function sortNotes(board: Board) {
   return notes.sort((a, b) => b.updated.localeCompare(a.updated))
 }
 
-export function registerRoutes(app: FastifyInstance): void {
+export function registerRoutes(app: FastifyInstance, hooks?: ServerHooks): void {
   app.get('/api/boards', async () => boardCounts())
 
   app.get('/api/notes', async (req, reply) => {
@@ -69,5 +75,20 @@ export function registerRoutes(app: FastifyInstance): void {
     return allNotes()
       .sort((a, b) => b.updated.localeCompare(a.updated))
       .slice(0, n)
+  })
+
+  app.get('/api/server-info', async () => {
+    return buildServerInfo(LAN_STATE.enabled)
+  })
+
+  app.post('/api/settings', async (req, reply) => {
+    const body = req.body as { lanEnabled?: unknown } | null | undefined
+    if (!body || typeof body.lanEnabled !== 'boolean') {
+      return reply.code(400).send({ error: 'body 必须为 { lanEnabled: boolean }' })
+    }
+    // 切换在后台执行：先应答再 close→re-listen（close 等当前请求结束，路由内 await 会死锁）。
+    // 应答反映目标状态；若切换失败服务端会回滚，前端核对 /api/server-info 提示。
+    hooks?.toggleLan(body.lanEnabled)
+    return buildServerInfo(body.lanEnabled)
   })
 }

@@ -1,4 +1,10 @@
 /* 设计令牌：浅色极简 —— 白底、留白、单一强调色 */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 :root {
   /* 颜色 */
   --color-bg: #fafafa;
@@ -40,4 +46,6 @@
   /* 布局 */
   --sidebar-width: 224px;
   --content-max-width: 720px;
+  /* 移动断点：768px。媒体查询不支持 var()，查询内直接写 max-width: 767px（< 768px） */
+  --breakpoint-md: 768px;
 }

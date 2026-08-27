@@ -22,8 +22,18 @@ export interface BoardInfo {
   count: number
 }
 
-async function get<T>(url: string): Promise<T> {
-  const res = await fetch(url)
+export interface ServerInfo {
+  lanEnabled: boolean
+  host: string
+  port: number
+  lanIps: string[]
+  urls: string[]
+  qrDataUrl: string
+  notesDir: string
+}
+
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, init)
   if (!res.ok) {
     let message = res.statusText
     try {
@@ -38,10 +48,17 @@ async function get<T>(url: string): Promise<T> {
 }
 
 export const api = {
-  boards: () => get<BoardInfo[]>('/api/boards'),
-  notes: (board: Board) => get<NoteMeta[]>(`/api/notes?board=${board}`),
+  boards: () => fetchJson<BoardInfo[]>('/api/boards'),
+  notes: (board: Board) => fetchJson<NoteMeta[]>(`/api/notes?board=${board}`),
   note: (board: Board, slug: string) =>
-    get<NoteDetail>(`/api/notes/${board}/${encodeURIComponent(slug)}`),
-  recent: (limit = 10) => get<NoteMeta[]>(`/api/recent?limit=${limit}`),
-  searchIndex: () => get<NoteDetail[]>('/api/search-index'),
+    fetchJson<NoteDetail>(`/api/notes/${board}/${encodeURIComponent(slug)}`),
+  recent: (limit = 10) => fetchJson<NoteMeta[]>(`/api/recent?limit=${limit}`),
+  searchIndex: () => fetchJson<NoteDetail[]>('/api/search-index'),
+  serverInfo: () => fetchJson<ServerInfo>('/api/server-info'),
+  updateSettings: (lanEnabled: boolean) =>
+    fetchJson<ServerInfo>('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lanEnabled }),
+    }),
 }
