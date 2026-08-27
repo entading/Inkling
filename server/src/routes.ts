@@ -5,6 +5,7 @@ import {
   getNote,
   listNotes,
   allNotes,
+  allNotesWithBody,
 } from './scanner.js'
 
 function isBoard(value: string): value is Board {
@@ -56,6 +57,10 @@ export function registerRoutes(app: FastifyInstance): void {
       return reply.code(404).send({ error: `词条不存在：${board}/${slug}` })
     }
     return note
+  })
+
+  app.get('/api/search-index', async () => {
+    return allNotesWithBody()
   })
 
   app.get('/api/recent', async (req) => {

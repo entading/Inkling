@@ -1,9 +1,13 @@
 <script setup lang="ts">
+import { RouterLink } from 'vue-router'
+
 defineProps<{ tag: string }>()
 </script>
 
 <template>
-  <span class="tag-badge">{{ tag }}</span>
+  <RouterLink :to="`/tags/${encodeURIComponent(tag)}`" class="tag-badge">
+    {{ tag }}
+  </RouterLink>
 </template>
 
 <style scoped>
@@ -16,5 +20,12 @@ defineProps<{ tag: string }>()
   font-size: 0.78rem;
   line-height: 1.5;
   white-space: nowrap;
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.tag-badge:hover {
+  background: var(--color-accent);
+  color: #fff;
 }
 </style>

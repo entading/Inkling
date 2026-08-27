@@ -43,4 +43,5 @@ export const api = {
   note: (board: Board, slug: string) =>
     get<NoteDetail>(`/api/notes/${board}/${encodeURIComponent(slug)}`),
   recent: (limit = 10) => get<NoteMeta[]>(`/api/recent?limit=${limit}`),
+  searchIndex: () => get<NoteDetail[]>('/api/search-index'),
 }

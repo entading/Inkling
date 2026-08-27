@@ -9,21 +9,22 @@ defineProps<{ notes: NoteMeta[] }>()
 <template>
   <ul v-if="notes.length" class="note-list">
     <li v-for="note in notes" :key="`${note.board}/${note.slug}`">
-      <RouterLink
-        :to="`/v/${note.board}/${encodeURIComponent(note.slug)}`"
-        class="note-row"
-      >
-        <div class="row-main">
+      <!-- 行内标题与标签均为独立链接，避免 <a> 嵌套 -->
+      <div class="note-row">
+        <RouterLink
+          :to="`/v/${note.board}/${encodeURIComponent(note.slug)}`"
+          class="row-main row-title-link"
+        >
           <span class="row-title">{{ note.title }}</span>
           <span v-if="note.ipa" class="row-ipa">{{ note.ipa }}</span>
           <span v-if="note.source" class="row-source">{{ note.source }}</span>
-        </div>
+        </RouterLink>
         <div class="row-side">
           <span class="row-board">{{ note.board === 'sentence' ? '长难句' : note.board === 'grammar' ? '语法' : note.board === 'phrase' ? '短语' : '词汇' }}</span>
           <TagBadge v-for="tag in note.tags.slice(0, 3)" :key="tag" :tag="tag" />
           <span class="row-updated">{{ note.updated }}</span>
         </div>
-      </RouterLink>
+      </div>
     </li>
   </ul>
   <p v-else class="empty">暂无词条</p>
@@ -48,8 +49,6 @@ defineProps<{ notes: NoteMeta[] }>()
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  text-decoration: none;
-  color: var(--color-text);
   transition: border-color 0.15s ease, box-shadow 0.15s ease,
     transform 0.15s ease;
 }
@@ -65,6 +64,15 @@ defineProps<{ notes: NoteMeta[] }>()
   align-items: baseline;
   gap: var(--space-3);
   min-width: 0;
+}
+
+.row-title-link {
+  text-decoration: none;
+  color: var(--color-text);
+}
+
+.row-title-link:hover .row-title {
+  color: var(--color-accent);
 }
 
 .row-title {
