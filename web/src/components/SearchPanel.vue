@@ -303,7 +303,6 @@ onBeforeUnmount(() => {
   right: 0;
   z-index: 30;
   max-height: 420px;
-  max-height: 420px;
   overflow-y: auto;
   margin: var(--space-2) 0 0;
   padding: var(--space-2);
@@ -372,5 +371,24 @@ onBeforeUnmount(() => {
   color: var(--color-text-secondary);
   font-size: 0.9rem;
   text-align: center;
+}
+
+@media (max-width: 767px) {
+  .search-panel {
+    max-width: none;
+  }
+
+  .search-error {
+    max-width: none;
+  }
+
+  .search-input {
+    padding: 12px 72px 12px 40px;
+    font-size: 0.98rem;
+  }
+
+  .search-icon {
+    left: 12px;
+  }
 }
 </style>

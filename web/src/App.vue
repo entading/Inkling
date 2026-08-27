@@ -23,6 +23,7 @@ import { boardRoutes } from './router'
           {{ r.label }}
         </RouterLink>
         <RouterLink to="/tags" class="nav-item" active-class="active">标签</RouterLink>
+        <RouterLink to="/settings" class="nav-item" active-class="active">设置</RouterLink>
       </nav>
 
       <p class="sidebar-foot">Markdown 文件即数据</p>
@@ -31,6 +32,20 @@ import { boardRoutes } from './router'
     <main class="content">
       <RouterView />
     </main>
+
+    <!-- 移动端底部导航：替代桌面侧边栏（设计 3.3），标签/设置收进首页右上角菜单 -->
+    <nav class="bottom-nav" aria-label="移动端主导航">
+      <RouterLink to="/" class="bottom-item" exact-active-class="active">首页</RouterLink>
+      <RouterLink
+        v-for="r in boardRoutes"
+        :key="r.path"
+        :to="r.path"
+        class="bottom-item"
+        active-class="active"
+      >
+        {{ r.label }}
+      </RouterLink>
+    </nav>
   </div>
 </template>
 
@@ -120,5 +135,48 @@ import { boardRoutes } from './router'
   flex: 1;
   min-width: 0;
   padding: var(--space-6) var(--space-7);
+}
+
+.bottom-nav {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .sidebar {
+    display: none;
+  }
+
+  .content {
+    padding: var(--space-4) var(--space-5) calc(72px + env(safe-area-inset-bottom));
+  }
+
+  .bottom-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    display: flex;
+    height: 56px;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .bottom-item {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.78rem;
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .bottom-item.active {
+    color: var(--color-accent);
+    font-weight: 500;
+  }
 }
 </style>

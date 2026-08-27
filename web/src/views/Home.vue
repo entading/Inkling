@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import NoteList from '../components/NoteList.vue'
 import SearchPanel from '../components/SearchPanel.vue'
@@ -10,7 +10,16 @@ const recent = ref<NoteMeta[]>([])
 const loading = ref(true)
 const error = ref('')
 
+/** 移动端右上角菜单（标签/设置入口，设计 3.3） */
+const menuOpen = ref(false)
+const menuRoot = ref<HTMLElement | null>(null)
+
+function onDocumentClick(e: MouseEvent) {
+  if (menuRoot.value && !menuRoot.value.contains(e.target as Node)) menuOpen.value = false
+}
+
 onMounted(async () => {
+  document.addEventListener('click', onDocumentClick)
   try {
     ;[boards.value, recent.value] = await Promise.all([
       api.boards(),
@@ -22,12 +31,37 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', onDocumentClick)
+})
 </script>
 
 <template>
   <div class="home">
-    <p class="eyebrow">个人英语学习知识沉淀库</p>
-    <h1 class="title">今天想查点什么？</h1>
+    <div class="home-top">
+      <div class="home-heading">
+        <p class="eyebrow">个人英语学习知识沉淀库</p>
+        <h1 class="title">今天想查点什么？</h1>
+      </div>
+
+      <div ref="menuRoot" class="top-menu">
+        <button
+          type="button"
+          class="menu-btn"
+          aria-label="更多"
+          aria-haspopup="true"
+          :aria-expanded="menuOpen"
+          @click="menuOpen = !menuOpen"
+        >
+          ⋯
+        </button>
+        <div v-if="menuOpen" class="menu-drop">
+          <RouterLink to="/tags" class="menu-item" @click="menuOpen = false">标签</RouterLink>
+          <RouterLink to="/settings" class="menu-item" @click="menuOpen = false">设置</RouterLink>
+        </div>
+      </div>
+    </div>
 
     <SearchPanel autofocus />
 
@@ -59,11 +93,68 @@ onMounted(async () => {
   margin: 0 auto;
 }
 
+.home-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
 .title {
   font-size: 1.6rem;
   font-weight: 600;
   margin: var(--space-2) 0 var(--space-6);
   letter-spacing: -0.01em;
+}
+
+.top-menu {
+  position: relative;
+  display: none;
+}
+
+.menu-btn {
+  width: 34px;
+  height: 34px;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.menu-btn:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.menu-drop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 40;
+  min-width: 120px;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.menu-item {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-size: 0.92rem;
+  text-decoration: none;
+}
+
+.menu-item:hover {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
 }
 
 .search-panel {
@@ -133,5 +224,28 @@ onMounted(async () => {
 
 .error {
   color: var(--color-danger);
+}
+
+@media (max-width: 767px) {
+  .top-menu {
+    display: block;
+  }
+
+  .title {
+    font-size: 1.35rem;
+    margin-bottom: var(--space-4);
+  }
+
+  .search-panel {
+    margin-bottom: var(--space-6);
+  }
+
+  .section-title {
+    margin-top: var(--space-6);
+  }
+
+  .board-card {
+    padding: var(--space-4);
+  }
 }
 </style>
