@@ -22,6 +22,7 @@ import { boardRoutes } from './router'
         >
           {{ r.label }}
         </RouterLink>
+        <RouterLink to="/tags" class="nav-item" active-class="active">标签</RouterLink>
       </nav>
 
       <p class="sidebar-foot">Markdown 文件即数据</p>

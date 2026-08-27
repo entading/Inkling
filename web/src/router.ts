@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Home from './views/Home.vue'
 import Board from './views/Board.vue'
 import NoteView from './views/NoteView.vue'
+import Tags from './views/Tags.vue'
+import TagDetail from './views/TagDetail.vue'
 import NotFound from './views/NotFound.vue'
 import type { Board as BoardName } from './api'
 
@@ -23,14 +25,20 @@ const router = createRouter({
       props: { board: r.board },
     })),
     { path: '/v/:board/:slug', name: 'note', component: NoteView },
+    { path: '/tags', name: 'tags', component: Tags },
+    { path: '/tags/:tag', name: 'tag-detail', component: TagDetail },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFound },
   ],
 })
 
 router.afterEach((to) => {
-  document.title = to.name === 'note'
-    ? `EN_tool · ${String(to.params.slug)}`
-    : 'EN_tool'
+  if (to.name === 'note') {
+    document.title = `EN_tool · ${String(to.params.slug)}`
+  } else if (to.name === 'tag-detail') {
+    document.title = `EN_tool · #${String(to.params.tag)}`
+  } else {
+    document.title = 'EN_tool'
+  }
 })
 
 export default router

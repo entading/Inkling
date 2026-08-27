@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import NoteList from '../components/NoteList.vue'
+import SearchPanel from '../components/SearchPanel.vue'
 import { api, type BoardInfo, type NoteMeta } from '../api'
 
 const boards = ref<BoardInfo[]>([])
@@ -28,18 +29,7 @@ onMounted(async () => {
     <p class="eyebrow">个人英语学习知识沉淀库</p>
     <h1 class="title">今天想查点什么？</h1>
 
-    <div class="search">
-      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="11" cy="11" r="7" />
-        <line x1="21" y1="21" x2="16.5" y2="16.5" />
-      </svg>
-      <input
-        class="search-input"
-        type="text"
-        placeholder="搜索词汇、短语、长难句、语法……（M2 开放）"
-        aria-label="搜索"
-      />
-    </div>
+    <SearchPanel autofocus />
 
     <p v-if="error" class="error">加载失败：{{ error }}（请确认服务端已启动）</p>
     <p v-else-if="loading" class="hint">加载中…</p>
@@ -76,43 +66,8 @@ onMounted(async () => {
   letter-spacing: -0.01em;
 }
 
-.search {
-  position: relative;
-  max-width: 560px;
+.search-panel {
   margin-bottom: var(--space-7);
-}
-
-.search-icon {
-  position: absolute;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 18px;
-  height: 18px;
-  color: var(--color-text-secondary);
-}
-
-.search-input {
-  width: 100%;
-  padding: 14px 16px 14px 44px;
-  font-size: 1rem;
-  font-family: inherit;
-  color: var(--color-text);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.search-input::placeholder {
-  color: var(--color-text-secondary);
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
 }
 
 .section-title {

@@ -168,3 +168,11 @@ export function boardCounts(): Array<{ board: Board; label: string; count: numbe
 export function allNotes(): NotePublic[] {
   return BOARDS.flatMap((board) => [...(index.get(board)?.values() ?? [])]).map(toPublic)
 }
+
+/** 全量词条（含正文），供前端一次性拉取建搜索索引 */
+export function allNotesWithBody(): NoteWithBody[] {
+  return allNotes().flatMap((n) => {
+    const full = getNote(n.board, n.slug)
+    return full ? [full] : []
+  })
+}
