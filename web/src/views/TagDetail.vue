@@ -17,7 +17,8 @@ const loading = ref(true)
 const error = ref('')
 const index = ref<NoteDetail[] | null>(null)
 
-const tag = computed(() => decodeURIComponent(String(route.params.tag ?? '')))
+// vue-router 已对 :tag 参数做过 URL 解码，直接使用即可（再解码会破坏含 % 的标签）
+const tag = computed(() => String(route.params.tag ?? ''))
 
 const total = computed(() =>
   index.value ? index.value.filter((n) => n.tags.includes(tag.value)).length : 0,
