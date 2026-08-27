@@ -172,7 +172,12 @@ export function allNotes(): NotePublic[] {
 /** 全量词条（含正文），供前端一次性拉取建搜索索引 */
 export function allNotesWithBody(): NoteWithBody[] {
   return allNotes().flatMap((n) => {
-    const full = getNote(n.board, n.slug)
-    return full ? [full] : []
+    try {
+      const full = getNote(n.board, n.slug)
+      return full ? [full] : []
+    } catch {
+      // 扫描与读盘之间的竞态（文件刚被删除），跳过该条
+      return []
+    }
   })
 }
