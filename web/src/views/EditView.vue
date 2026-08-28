@@ -64,6 +64,9 @@ function clearDraft(board: Board, slug: string): void {
 // ---------- 加载 ----------
 
 async function load() {
+  // 仅在编辑页自身路由上加载：离开本页时 route.params 变化也会触发 watch，
+  // 此时若继续会发无效请求，且 clearTimeout 会杀掉待写入的 3 秒草稿定时器（丢失草稿）
+  if (route.name !== 'note-edit') return
   const board = route.params.board as Board
   const slug = route.params.slug as string
   window.clearTimeout(draftTimer)
@@ -188,7 +191,14 @@ function onDrop(e: DragEvent) {
 // ---------- 离开保护 ----------
 
 function confirmLeave(): boolean {
-  return !dirty.value || window.confirm('当前有未保存的修改，确定离开？（草稿最多保留到最近一次自动暂存）')
+  if (!dirty.value) return true
+  if (!window.confirm('当前有未保存的修改，确定离开？（未保存内容将暂存为草稿，回到本页可恢复）')) {
+    return false
+  }
+  // 立即同步落草稿：可能编辑后不满 3 秒就离开，pending 定时器会随组件卸载被清除
+  window.clearTimeout(draftTimer)
+  writeDraft(route.params.board as Board, route.params.slug as string, draft.value)
+  return true
 }
 
 onBeforeRouteLeave(() => confirmLeave())
