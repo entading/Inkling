@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { renderMarkdown } from '../lib/markdown'
+import { render } from '../lib/markdown'
 
 const props = defineProps<{ body: string }>()
 
-const html = computed(() => renderMarkdown(props.body))
+const html = computed(() => render(props.body))
 </script>
 
 <template>
