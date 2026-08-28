@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, RouterLink } from 'vue-router'
 import NoteList from '../components/NoteList.vue'
 import AZIndex from '../components/AZIndex.vue'
 import { api, type Board, type NoteDetail, type NoteMeta } from '../api'
@@ -81,7 +81,10 @@ watch(() => route.query, syncFromRoute)
   <div class="board-page">
     <header class="board-header">
       <h1 class="board-title">{{ boardLabels[board] }}</h1>
-      <p class="board-meta">{{ filtered.length }} / {{ notes.length }} 条词条</p>
+      <div class="board-header-right">
+        <p class="board-meta">{{ filtered.length }} / {{ notes.length }} 条词条</p>
+        <RouterLink :to="`/new?board=${board}`" class="new-link">＋ 新建</RouterLink>
+      </div>
     </header>
 
     <div class="board-search">
@@ -140,6 +143,30 @@ watch(() => route.query, syncFromRoute)
 .board-meta {
   color: var(--color-text-secondary);
   font-size: 0.9rem;
+}
+
+.board-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+/* 次级按钮（描边），带当前板块跳新建页（设计 3.2 板块页「新建」入口） */
+.new-link {
+  flex-shrink: 0;
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.new-link:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
 .board-search {

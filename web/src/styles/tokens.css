@@ -46,6 +46,8 @@
   /* 布局 */
   --sidebar-width: 224px;
   --content-max-width: 720px;
+  /* 编辑页分屏需要更宽容器（720px 下每栏仅约 350px） */
+  --edit-max-width: 1080px;
   /* 移动断点：768px。媒体查询不支持 var()，查询内直接写 max-width: 767px（< 768px） */
   --breakpoint-md: 768px;
 }

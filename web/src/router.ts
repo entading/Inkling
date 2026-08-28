@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Home from './views/Home.vue'
 import Board from './views/Board.vue'
 import NoteView from './views/NoteView.vue'
+import EditView from './views/EditView.vue'
+import NewNote from './views/NewNote.vue'
 import Tags from './views/Tags.vue'
 import TagDetail from './views/TagDetail.vue'
 import Settings from './views/Settings.vue'
@@ -26,6 +28,8 @@ const router = createRouter({
       props: { board: r.board },
     })),
     { path: '/v/:board/:slug', name: 'note', component: NoteView },
+    { path: '/v/:board/:slug/edit', name: 'note-edit', component: EditView },
+    { path: '/new', name: 'new-note', component: NewNote },
     { path: '/tags', name: 'tags', component: Tags },
     { path: '/tags/:tag', name: 'tag-detail', component: TagDetail },
     { path: '/settings', name: 'settings', component: Settings },
@@ -36,6 +40,10 @@ const router = createRouter({
 router.afterEach((to) => {
   if (to.name === 'note') {
     document.title = `EN_tool · ${String(to.params.slug)}`
+  } else if (to.name === 'note-edit') {
+    document.title = `EN_tool · 编辑 ${String(to.params.slug)}`
+  } else if (to.name === 'new-note') {
+    document.title = 'EN_tool · 新建词条'
   } else if (to.name === 'tag-detail') {
     document.title = `EN_tool · #${String(to.params.tag)}`
   } else {
