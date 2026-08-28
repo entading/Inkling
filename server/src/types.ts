@@ -30,6 +30,11 @@ export interface NoteWithBody extends NotePublic {
   body: string
 }
 
+/** 单条词条完整数据：额外携带原始文件源码（含 frontmatter），编辑页用 */
+export interface NoteWithRaw extends NoteWithBody {
+  raw: string
+}
+
 export interface BoardInfo {
   board: Board
   label: string

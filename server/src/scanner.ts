@@ -9,6 +9,7 @@ import {
   type Note,
   type NotePublic,
   type NoteWithBody,
+  type NoteWithRaw,
 } from './types.js'
 
 export const NOTES_DIR = path.resolve(import.meta.dirname, '../../notes')
@@ -25,7 +26,7 @@ function dateOfUtc(d: Date): string {
 }
 
 /** 文件系统时间（本地时刻）按本地组件输出，避免 UTC+8 凌晨回退偏一天 */
-function dateOfLocal(d: Date): string {
+export function dateOfLocal(d: Date): string {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
@@ -153,6 +154,14 @@ export function getNote(board: Board, slug: string): NoteWithBody | null {
   return { ...toPublic(note), body: matter(raw).content }
 }
 
+/** 单条完整数据 + 原始文件源码（含 frontmatter），编辑页用 */
+export function getNoteRaw(board: Board, slug: string): NoteWithRaw | null {
+  const note = index.get(board)?.get(slug)
+  if (!note) return null
+  const raw = fs.readFileSync(path.join(NOTES_DIR, note.filePath), 'utf-8')
+  return { ...toPublic(note), body: matter(raw).content, raw }
+}
+
 export function listNotes(board: Board): NotePublic[] {
   return [...(index.get(board)?.values() ?? [])].map(toPublic)
 }
@@ -180,4 +189,19 @@ export function allNotesWithBody(): NoteWithBody[] {
       return []
     }
   })
+}
+
+/**
+ * 全量写入原始 md 源码（原样落盘，不改写内容），并立即 upsert 内存索引——
+ * 不依赖 chokidar 的 awaitWriteFinish 窗口，写完即刻可读（读接口 / 列表零延迟一致）。
+ */
+export function writeNote(board: Board, slug: string, content: string): NoteWithBody {
+  const dir = path.join(NOTES_DIR, board)
+  fs.mkdirSync(dir, { recursive: true })
+  const filePath = path.join(dir, `${slug}.md`)
+  fs.writeFileSync(filePath, content, 'utf-8')
+  upsert(filePath)
+  const note = getNote(board, slug)
+  if (!note) throw new Error(`写入后索引缺失：${board}/${slug}`)
+  return note
 }

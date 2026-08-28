@@ -1,18 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import MarkdownIt from 'markdown-it'
+import { onMounted, ref, watch } from 'vue'
+import { useRoute, RouterLink } from 'vue-router'
 import TagBadge from '../components/TagBadge.vue'
-import { api, type Board, type NoteDetail } from '../api'
+import MarkdownViewer from '../components/MarkdownViewer.vue'
+import { api, type Board, type NoteDetailRaw } from '../api'
 
 const route = useRoute()
-const note = ref<NoteDetail | null>(null)
+const note = ref<NoteDetailRaw | null>(null)
 const error = ref('')
 const loading = ref(true)
-
-const md = new MarkdownIt({ html: false, linkify: true, breaks: false })
-
-const html = computed(() => (note.value ? md.render(note.value.body) : ''))
 
 async function load() {
   const board = route.params.board as Board
@@ -43,19 +39,22 @@ watch(() => route.params, load)
 
     <article v-else-if="note" class="note">
       <header class="note-header">
-        <h1 class="note-title">{{ note.title }}</h1>
-        <p v-if="note.ipa" class="ipa">{{ note.ipa }}</p>
-        <div class="note-tags">
-          <TagBadge v-for="tag in note.tags" :key="tag" :tag="tag" />
+        <div class="note-head-main">
+          <h1 class="note-title">{{ note.title }}</h1>
+          <p v-if="note.ipa" class="ipa">{{ note.ipa }}</p>
+          <div class="note-tags">
+            <TagBadge v-for="tag in note.tags" :key="tag" :tag="tag" />
+          </div>
+          <dl class="note-meta">
+            <div v-if="note.source"><dt>来源</dt><dd>{{ note.source }}</dd></div>
+            <div><dt>创建</dt><dd>{{ note.created }}</dd></div>
+            <div><dt>更新</dt><dd>{{ note.updated }}</dd></div>
+          </dl>
         </div>
-        <dl class="note-meta">
-          <div v-if="note.source"><dt>来源</dt><dd>{{ note.source }}</dd></div>
-          <div><dt>创建</dt><dd>{{ note.created }}</dd></div>
-          <div><dt>更新</dt><dd>{{ note.updated }}</dd></div>
-        </dl>
+        <RouterLink :to="`/v/${note.board}/${note.slug}/edit`" class="edit-link">编辑</RouterLink>
       </header>
 
-      <div class="note-body" v-html="html" />
+      <MarkdownViewer :body="note.body" />
     </article>
   </div>
 </template>
@@ -88,6 +87,17 @@ watch(() => route.params, load)
   border-radius: var(--radius-lg);
   padding: var(--space-7) var(--space-7) var(--space-7);
   box-shadow: var(--shadow-sm);
+}
+
+.note-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.note-head-main {
+  min-width: 0;
 }
 
 .note-title {
@@ -137,104 +147,26 @@ watch(() => route.params, load)
   color: var(--color-text);
 }
 
+.edit-link {
+  flex-shrink: 0;
+  padding: var(--space-1) var(--space-4);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.edit-link:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
 .note-body {
   margin-top: var(--space-6);
-  line-height: 1.8;
-  font-size: 1rem;
-  color: var(--color-text);
-}
-
-.note-body :deep(h1) {
-  font-size: 1.35rem;
-  margin: 1.6em 0 0.6em;
-}
-
-.note-body :deep(h2) {
-  font-size: 1.15rem;
-  margin: 1.5em 0 0.5em;
-}
-
-.note-body :deep(h3) {
-  font-size: 1.05rem;
-}
-
-.note-body :deep(p) {
-  margin: 0.6em 0;
-}
-
-.note-body :deep(ul),
-.note-body :deep(ol) {
-  margin: 0.6em 0;
-  padding-left: 1.6em;
-}
-
-.note-body :deep(li) {
-  margin: 0.3em 0;
-}
-
-.note-body :deep(blockquote) {
-  margin: 0.8em 0;
-  padding: 0.4em 1em;
-  border-left: 3px solid var(--color-accent);
-  color: var(--color-text-secondary);
-  background: var(--color-bg);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-}
-
-.note-body :deep(code) {
-  padding: 0.15em 0.4em;
-  border-radius: var(--radius-sm);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  font-size: 0.9em;
-}
-
-.note-body :deep(pre) {
-  padding: var(--space-4);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  overflow-x: auto;
-}
-
-.note-body :deep(pre code) {
-  background: transparent;
-  border: none;
-  padding: 0;
-}
-
-.note-body :deep(a) {
-  color: var(--color-accent);
-  text-decoration: none;
-  border-bottom: 1px solid rgba(59, 130, 246, 0.3);
-}
-
-.note-body :deep(a:hover) {
-  border-bottom-color: var(--color-accent);
-}
-
-.note-body :deep(table) {
-  border-collapse: collapse;
-  width: 100%;
-  margin: 0.8em 0;
-  font-size: 0.95em;
-}
-
-.note-body :deep(th),
-.note-body :deep(td) {
-  border: 1px solid var(--color-border);
-  padding: var(--space-2) var(--space-3);
-  text-align: left;
-}
-
-.note-body :deep(th) {
-  background: var(--color-bg);
-}
-
-.note-body :deep(hr) {
-  border: none;
-  border-top: 1px solid var(--color-border);
-  margin: var(--space-5) 0;
 }
 
 @media (max-width: 767px) {
@@ -249,16 +181,6 @@ watch(() => route.params, load)
   .note-meta {
     flex-wrap: wrap;
     gap: var(--space-2) var(--space-5);
-  }
-
-  .note-body {
-    font-size: 0.95rem;
-  }
-
-  /* 宽表格在窄屏转为块级滚动容器，避免横向撑破页面 */
-  .note-body :deep(table) {
-    display: block;
-    overflow-x: auto;
   }
 }
 </style>

@@ -45,20 +45,24 @@ onBeforeUnmount(() => {
         <h1 class="title">今天想查点什么？</h1>
       </div>
 
-      <div ref="menuRoot" class="top-menu">
-        <button
-          type="button"
-          class="menu-btn"
-          aria-label="更多"
-          aria-haspopup="true"
-          :aria-expanded="menuOpen"
-          @click="menuOpen = !menuOpen"
-        >
-          ⋯
-        </button>
-        <div v-if="menuOpen" class="menu-drop">
-          <RouterLink to="/tags" class="menu-item" @click="menuOpen = false">标签</RouterLink>
-          <RouterLink to="/settings" class="menu-item" @click="menuOpen = false">设置</RouterLink>
+      <div class="home-actions">
+        <RouterLink to="/new" class="new-btn">＋ 新建词条</RouterLink>
+
+        <div ref="menuRoot" class="top-menu">
+          <button
+            type="button"
+            class="menu-btn"
+            aria-label="更多"
+            aria-haspopup="true"
+            :aria-expanded="menuOpen"
+            @click="menuOpen = !menuOpen"
+          >
+            ⋯
+          </button>
+          <div v-if="menuOpen" class="menu-drop">
+            <RouterLink to="/tags" class="menu-item" @click="menuOpen = false">标签</RouterLink>
+            <RouterLink to="/settings" class="menu-item" @click="menuOpen = false">设置</RouterLink>
+          </div>
         </div>
       </div>
     </div>
@@ -98,6 +102,29 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-3);
+}
+
+.home-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+/* 主按钮（强调色实心），桌面与移动端均可见（设计 5.1 新建词条快捷入口） */
+.new-btn {
+  padding: var(--space-2) var(--space-4);
+  font-size: 0.9rem;
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: #fff;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: opacity 0.15s ease;
+}
+
+.new-btn:hover {
+  opacity: 0.88;
 }
 
 .title {
