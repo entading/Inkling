@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, RouterLink, useRoute } from 'vue-router'
 import MarkdownViewer from '../components/MarkdownViewer.vue'
 import { api, type Board, type NoteDetailRaw } from '../api'
-import { stripFrontmatter } from '../lib/markdown'
+import { extractFrontmatter, stripFrontmatter } from '../lib/markdown'
 
 const route = useRoute()
 
@@ -18,6 +18,24 @@ const lastSaved = ref('')
 
 /** 草稿恢复提示条 */
 const draftRestored = ref(false)
+
+/**
+ * frontmatter 丢失软保护：上次保存（或载入）时的 frontmatter 块。
+ * 用户可能编辑正文时误删 frontmatter（全量源码编辑语义），丢失时提示并可一键恢复；
+ * 不禁止删除——手写文件无 frontmatter 是合法状态，仅保存时二次确认。
+ */
+const savedFrontmatter = ref<string | null>(null)
+const fmLost = computed(
+  () => savedFrontmatter.value !== null && extractFrontmatter(draft.value) === null,
+)
+const fmBannerDismissed = ref(false)
+
+function restoreFrontmatter() {
+  if (savedFrontmatter.value && extractFrontmatter(draft.value) === null) {
+    // 块自带结尾换行，直接拼接即可
+    draft.value = savedFrontmatter.value + draft.value
+  }
+}
 
 /** 移动端单视图切换（设计 3.3：编辑从简） */
 const viewMode = ref<'source' | 'preview'>('source')
@@ -74,6 +92,7 @@ async function load() {
   loading.value = true
   loadError.value = ''
   draftRestored.value = false
+  fmBannerDismissed.value = false
   saveState.value = 'idle'
   saveError.value = ''
   try {
@@ -81,6 +100,7 @@ async function load() {
     note.value = detail
     draft.value = detail.raw
     lastSaved.value = detail.raw
+    savedFrontmatter.value = extractFrontmatter(detail.raw)
     previewSrc.value = stripFrontmatter(detail.raw)
     // 检测到草稿 → 恢复源码并提示；与磁盘内容相同则无需打扰
     const saved = readDraft(board, slug)
@@ -118,6 +138,10 @@ watch(draft, (v) => {
 
 async function save() {
   if (saveState.value === 'saving') return
+  // frontmatter 被删除时二次确认（可取消后用提示条「恢复」一键还原）
+  if (fmLost.value && !window.confirm('frontmatter（标题 / 标签 / 来源等元信息）已被删除，保存后阅读页标题将回退为文件名、标签与来源将丢失。确定保存吗？')) {
+    return
+  }
   const board = route.params.board as Board
   const slug = route.params.slug as string
   saveState.value = 'saving'
@@ -125,6 +149,7 @@ async function save() {
   try {
     await api.saveNote(board, slug, draft.value)
     lastSaved.value = draft.value
+    savedFrontmatter.value = extractFrontmatter(draft.value)
     saveState.value = 'saved'
     // 正式保存成功后清除草稿（刷新不再恢复）
     window.clearTimeout(draftTimer)
@@ -268,6 +293,12 @@ watch(() => route.params, load)
     <p v-if="draftRestored" class="draft-banner">
       检测到未保存的草稿，已恢复源码（编辑暂停 3 秒自动暂存，保存成功后清除）。
       <button type="button" class="banner-close" aria-label="关闭提示" @click="draftRestored = false">×</button>
+    </p>
+
+    <p v-if="fmLost && !fmBannerDismissed" class="draft-banner warn" role="alert">
+      检测到 frontmatter（标题 / 标签 / 来源等元信息）已被删除，保存后阅读页标题将回退为文件名。
+      <button type="button" class="banner-action" @click="restoreFrontmatter">恢复</button>
+      <button type="button" class="banner-close" aria-label="关闭提示" @click="fmBannerDismissed = true">×</button>
     </p>
 
     <p v-if="loadError" class="error">
@@ -446,6 +477,27 @@ watch(() => route.params, load)
 
 .banner-close:hover {
   color: var(--color-text);
+}
+
+/* frontmatter 丢失警示变体 */
+.draft-banner.warn {
+  background: var(--color-danger-soft);
+  border-color: var(--color-danger);
+  color: var(--color-text);
+}
+
+.banner-action {
+  border: none;
+  background: none;
+  color: var(--color-danger);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.banner-action:hover {
+  opacity: 0.8;
 }
 
 .hint,
