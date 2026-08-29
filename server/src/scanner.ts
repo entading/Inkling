@@ -39,14 +39,35 @@ function boardOf(filePath: string): Board | null {
   return BOARDS.includes(relBoard as Board) ? (relBoard as Board) : null
 }
 
+/**
+ * 解析 frontmatter；YAML 语法错误时按「无 frontmatter」兜底（title=文件名、
+ * 正文=全文原文，坏 FM 行以文本可见，用户可读可改），仅 warn 不中断服务。
+ */
+function parseFrontmatter(raw: string, filePath: string): { data: Record<string, unknown>; content: string } {
+  try {
+    return matter(raw)
+  } catch (err) {
+    console.warn(
+      `frontmatter YAML 解析失败（已按无 frontmatter 兜底）：${filePath} —— ${err instanceof Error ? err.message : String(err)}`,
+    )
+    return { data: {}, content: raw }
+  }
+}
+
 /** 解析一个 md 文件：gray-matter + 无 frontmatter 兜底 */
 function parseNote(filePath: string): Note | null {
   const board = boardOf(filePath)
   if (!board) return null
 
-  const raw = fs.readFileSync(filePath, 'utf-8')
-  const stat = fs.statSync(filePath)
-  const data = matter(raw)
+  let raw: string
+  let stat: fs.Stats
+  try {
+    raw = fs.readFileSync(filePath, 'utf-8')
+    stat = fs.statSync(filePath)
+  } catch {
+    return null // 读盘竞态：文件已被删除
+  }
+  const data = parseFrontmatter(raw, filePath)
   const slug = path.basename(filePath, '.md')
 
   const created: Date =
@@ -151,7 +172,7 @@ export function getNote(board: Board, slug: string): NoteWithBody | null {
   const note = index.get(board)?.get(slug)
   if (!note) return null
   const raw = fs.readFileSync(path.join(NOTES_DIR, note.filePath), 'utf-8')
-  return { ...toPublic(note), body: matter(raw).content }
+  return { ...toPublic(note), body: parseFrontmatter(raw, note.filePath).content }
 }
 
 /** 单条完整数据 + 原始文件源码（含 frontmatter），编辑页用 */
@@ -159,7 +180,7 @@ export function getNoteRaw(board: Board, slug: string): NoteWithRaw | null {
   const note = index.get(board)?.get(slug)
   if (!note) return null
   const raw = fs.readFileSync(path.join(NOTES_DIR, note.filePath), 'utf-8')
-  return { ...toPublic(note), body: matter(raw).content, raw }
+  return { ...toPublic(note), body: parseFrontmatter(raw, note.filePath).content, raw }
 }
 
 export function listNotes(board: Board): NotePublic[] {
