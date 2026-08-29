@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute, RouterLink } from 'vue-router'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
 import TagBadge from '../components/TagBadge.vue'
 import MarkdownViewer from '../components/MarkdownViewer.vue'
 import { api, type Board, type NoteDetailRaw } from '../api'
-import { getBacklinks, type Backlink } from '../lib/backlinks'
-import { BOARD_LABELS } from '../lib/search'
+import { getBacklinks, stripCodeText, type Backlink } from '../lib/backlinks'
+import { parseWikiTarget, setLinkIndex, WIKI_LINK_RE } from '../lib/markdown'
+import { BOARD_LABELS, getSearchIndex, invalidateSearchIndex } from '../lib/search'
 import { isTtsSupported, speak } from '../lib/tts'
 
 const route = useRoute()
+const router = useRouter()
 const note = ref<NoteDetailRaw | null>(null)
 const error = ref('')
 const loading = ref(true)
@@ -130,8 +132,14 @@ async function load() {
   backlinks.value = []
   // 切换词条后旧选区可能失效（节点被替换）却不触发 selectionchange，工具条主动隐藏
   barVisible.value = false
+  missingLinks.value = []
+  brokenBannerDismissed.value = false
+  deleteError.value = ''
+  confirmingDelete.value = false
   try {
     note.value = await api.note(board, slug)
+    // 失效链接扫描在链接索引就绪后进行，不阻塞正文渲染
+    void refreshMissingLinks()
     // 反向引用并行加载，不阻塞正文；解析完成时若已切走词条则丢弃结果
     void getBacklinks(board, slug)
       .then((list) => {
@@ -152,6 +160,94 @@ async function load() {
 
 onMounted(load)
 watch(() => route.params, load)
+
+// ---------- 删除词条（M7）：内联两态确认，非模态弹窗 ----------
+
+const confirmingDelete = ref(false)
+const deleting = ref(false)
+const deleteError = ref('')
+const headActionsEl = ref<HTMLElement | null>(null)
+
+/** 点按钮外取消确认态（点在操作区内不取消，允许在两个按钮间移动） */
+function onGlobalPointerDown(e: PointerEvent): void {
+  if (!confirmingDelete.value) return
+  if (headActionsEl.value && e.target instanceof Node && headActionsEl.value.contains(e.target)) return
+  confirmingDelete.value = false
+}
+
+onMounted(() => document.addEventListener('pointerdown', onGlobalPointerDown))
+onBeforeUnmount(() => document.removeEventListener('pointerdown', onGlobalPointerDown))
+
+/** 清除该词条的编辑草稿（key 与 EditView 一致），删除后残留草稿无意义 */
+function clearDraft(board: Board, slug: string): void {
+  try {
+    localStorage.removeItem(`en_tool:draft:${board}:${slug}`)
+  } catch {
+    /* 存储不可用（隐私模式等）时静默跳过 */
+  }
+}
+
+async function doDelete(): Promise<void> {
+  if (!note.value || deleting.value) return
+  deleting.value = true
+  deleteError.value = ''
+  const { board, slug } = note.value
+  try {
+    await api.deleteNote(board, slug)
+    // 索引/搜索/标签缓存失效 + 草稿清理，然后回板块页
+    invalidateSearchIndex()
+    clearDraft(board, slug)
+    confirmingDelete.value = false
+    void router.push(`/${board}`)
+  } catch (e) {
+    deleteError.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    deleting.value = false
+  }
+}
+
+// ---------- 失效链接提示条（M7）：扫描正文 [[...]] 中未解析的目标 ----------
+
+interface MissingTarget {
+  /** 链接显示文本（原始书写文本，与正文所见一致） */
+  display: string
+  board: string
+  slug: string
+  title: string
+}
+
+const missingLinks = ref<MissingTarget[]>([])
+const brokenBannerDismissed = ref(false)
+
+// 独立正则对象：matchAll 的 clone 会复制原 regex 的 lastIndex，与 inline rule 共用对象会互相污染（M5 教训）
+const MISSING_SCAN_RE = new RegExp(WIKI_LINK_RE.source, 'g')
+
+/** 统计正文中失效的 [[...]] 目标：剥离代码文本（与渲染语义一致）+ 去重 + 跳过非法空目标 */
+function scanMissingLinks(body: string): MissingTarget[] {
+  const seen = new Set<string>()
+  const list: MissingTarget[] = []
+  for (const m of stripCodeText(body).matchAll(MISSING_SCAN_RE)) {
+    const display = m[1].trim()
+    const target = parseWikiTarget(display)
+    if (target.resolved || !target.slug) continue
+    const key = `${target.board}/${target.slug}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    list.push({ display, board: target.board, slug: target.slug, title: target.slug })
+  }
+  return list
+}
+
+/** 等链接索引就绪后扫描（直接复用其缓存；先 setLinkIndex 保证解析用最新存在性数据） */
+async function refreshMissingLinks(): Promise<void> {
+  try {
+    const notes = await getSearchIndex()
+    setLinkIndex(notes)
+    if (note.value) missingLinks.value = scanMissingLinks(note.value.body)
+  } catch {
+    missingLinks.value = [] // 索引不可得时不提示，不影响阅读
+  }
+}
 </script>
 
 <template>
@@ -192,8 +288,40 @@ watch(() => route.params, load)
             <div><dt>更新</dt><dd>{{ note.updated }}</dd></div>
           </dl>
         </div>
-        <RouterLink :to="`/v/${note.board}/${note.slug}/edit`" class="edit-link">编辑</RouterLink>
+        <div ref="headActionsEl" class="note-head-actions">
+          <RouterLink :to="`/v/${note.board}/${note.slug}/edit`" class="edit-link">编辑</RouterLink>
+          <!-- 内联两态确认（M7）：点「删除」变「确认删除？」，再点执行，点按钮外取消 -->
+          <button
+            v-if="confirmingDelete"
+            type="button"
+            class="delete-btn confirm"
+            :disabled="deleting"
+            @click="doDelete"
+          >
+            确认删除？
+          </button>
+          <button v-else type="button" class="delete-btn" @click="confirmingDelete = true">
+            删除
+          </button>
+        </div>
       </header>
+
+      <p v-if="deleteError" class="delete-error">删除失败：{{ deleteError }}</p>
+
+      <p
+        v-if="missingLinks.length > 0 && !brokenBannerDismissed"
+        class="missing-banner"
+        role="alert"
+      >
+        本文有 {{ missingLinks.length }} 个失效链接：
+        <template v-for="(t, i) in missingLinks" :key="`${t.board}/${t.slug}`">
+          <RouterLink
+            class="missing-target"
+            :to="`/new?board=${encodeURIComponent(t.board)}&slug=${encodeURIComponent(t.slug)}&title=${encodeURIComponent(t.title)}`"
+          >{{ t.display }}</RouterLink><span v-if="i < missingLinks.length - 1">、</span>
+        </template>
+        <button type="button" class="banner-close" aria-label="关闭提示" @click="brokenBannerDismissed = true">×</button>
+      </p>
 
       <MarkdownViewer :body="note.body" />
 
@@ -308,10 +436,10 @@ watch(() => route.params, load)
   background: var(--color-accent-soft);
 }
 
-/* 选中朗读浮动工具条：fixed 定位，z-index 高于移动端底部导航（App.vue 的 40） */
+/* 选中朗读浮动工具条：fixed 定位，z-index 高于移动端底部导航 */
 .sel-bar {
   position: fixed;
-  z-index: 50;
+  z-index: var(--z-float);
   padding: 4px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -374,8 +502,14 @@ watch(() => route.params, load)
   color: var(--color-text);
 }
 
-.edit-link {
+.note-head-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   flex-shrink: 0;
+}
+
+.edit-link {
   padding: var(--space-1) var(--space-4);
   font-size: 0.88rem;
   line-height: 1.6;
@@ -392,8 +526,85 @@ watch(() => route.params, load)
   border-color: var(--color-accent);
 }
 
-.note-body {
-  margin-top: var(--space-6);
+/* 删除按钮：常态与「编辑」同款，hover 变危险色；确认态实底红 */
+.delete-btn {
+  padding: var(--space-1) var(--space-4);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  font-family: inherit;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.delete-btn:hover {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.delete-btn.confirm {
+  color: #fff;
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.delete-btn.confirm:hover {
+  color: #fff;
+  opacity: 0.9;
+}
+
+.delete-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 失效链接提示条（M7）：复用 EditView banner 的危险色变体模式 */
+.missing-banner {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  margin: var(--space-5) 0 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.85rem;
+  color: var(--color-text);
+  background: var(--color-danger-soft);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-md);
+}
+
+.missing-target {
+  color: var(--color-danger);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.missing-target:hover {
+  opacity: 0.8;
+}
+
+.banner-close {
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.banner-close:hover {
+  color: var(--color-text);
+}
+
+.delete-error {
+  margin: var(--space-3) 0 0;
+  font-size: 0.85rem;
+  color: var(--color-danger);
 }
 
 /* 反向引用面板（M5）：无引用时整节隐藏 */

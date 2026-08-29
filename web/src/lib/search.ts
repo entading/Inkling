@@ -42,6 +42,12 @@ export function invalidateSearchIndex(): void {
   indexPromise = null
 }
 
+/** 按 板块 + slug 精确查找词条（wiki 链接悬停预览用）；未命中返回 null */
+export async function findNote(board: Board, slug: string): Promise<NoteDetail | null> {
+  const index = await getSearchIndex()
+  return index.find((n) => n.board === board && n.slug === slug) ?? null
+}
+
 const BASE_KEYS: FuseOptionKey<NoteDetail>[] = ['title', 'tags']
 const BODY_KEYS: FuseOptionKey<NoteDetail>[] = ['title', 'tags', 'body']
 

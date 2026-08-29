@@ -24,8 +24,9 @@ const SCAN_RE = new RegExp(WIKI_LINK_RE.source, 'g')
  * 扫描前剥离代码文本：围栏代码块与行内代码中的 [[...]] 不渲染为链接（inline 解析不进入代码），
  * 不剥离会让代码里的 wiki 语法示例凭空生成反向引用，与渲染语义不一致。
  * 已知局限：4 空格缩进代码块不剥离（无法与列表嵌套缩进安全区分，本库实际用法极少）。
+ * 导出供 NoteView 失效链接扫描复用（M7），保证「代码里的 [[...]] 不算链接」语义只写一份。
  */
-function stripCodeText(body: string): string {
+export function stripCodeText(body: string): string {
   return body
     .replace(/```[\s\S]*?```/g, '\n')
     .replace(/~~~[\s\S]*?~~~/g, '\n')

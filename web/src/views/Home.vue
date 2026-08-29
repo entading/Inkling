@@ -161,7 +161,7 @@ onBeforeUnmount(() => {
   position: absolute;
   right: 0;
   top: calc(100% + 8px);
-  z-index: 40;
+  z-index: var(--z-nav);
   min-width: 120px;
   padding: var(--space-2);
   background: var(--color-surface);

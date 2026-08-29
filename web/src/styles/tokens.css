@@ -51,4 +51,17 @@
   --edit-max-width: 1080px;
   /* 移动断点：768px。媒体查询不支持 var()，查询内直接写 max-width: 767px（< 768px） */
   --breakpoint-md: 768px;
+
+  /* 层级（M7 令牌化，从低到高）：sticky 字母条 < 搜索下拉 < 底部导航/首页菜单 < 浮动卡片 */
+  --z-rail: 20;
+  --z-drop: 30;
+  --z-nav: 40;
+  --z-float: 50;
+}
+
+/* 全局键盘焦点样式（M7）：键盘 Tab 导航时才出现（focus-visible），鼠标点击不触发 */
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }

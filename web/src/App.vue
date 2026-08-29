@@ -155,7 +155,7 @@ import { boardRoutes } from './router'
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 40;
+    z-index: var(--z-nav);
     display: flex;
     height: 56px;
     padding-bottom: env(safe-area-inset-bottom);

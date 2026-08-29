@@ -99,6 +99,9 @@ md.inline.ruler.before('link', 'wiki', (state, silent) => {
   open.attrSet('class', target.resolved ? 'wiki-link' : 'wiki-link is-missing')
   open.attrSet('data-board', target.board)
   open.attrSet('data-slug', target.slug)
+  // 无 href（跳转靠事件委托），补 tabindex/role 使键盘可达（M7）：Tab 聚焦 + Enter 触发跳转
+  open.attrSet('tabindex', '0')
+  open.attrSet('role', 'link')
   // 缺失目标记录 slug 作 stub 创建预填标题（显式形式不带板块前缀；显示文本仍为原始书写文本）
   if (!target.resolved) open.attrSet('data-title', target.slug)
   const inner = state.push('text', '', 0)

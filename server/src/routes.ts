@@ -8,9 +8,11 @@ import {
   allNotes,
   allNotesWithBody,
   writeNote,
+  removeNote,
 } from './scanner.js'
 import { buildTemplate } from './templates.js'
 import { LAN_STATE, buildServerInfo } from './settings.js'
+import { commitNoteDeletion } from './gitCommit.js'
 
 /** 由 index.ts 注入：请求切换局域网监听（后台执行，先应答后 close→re-listen） */
 export interface ServerHooks {
@@ -165,5 +167,28 @@ export function registerRoutes(app: FastifyInstance, hooks?: ServerHooks): void 
       req.log.error(err)
       return reply.code(500).send({ error: `写入失败：${err instanceof Error ? err.message : String(err)}` })
     }
+  })
+
+  app.delete('/api/notes/:board/:slug', async (req, reply) => {
+    const { board, slug } = req.params as { board: string; slug: string }
+    // 校验同 PUT：板块/slug 不存在或不安全一律 404
+    if (!isBoard(board)) {
+      return reply.code(404).send({ error: `板块不存在：${board}` })
+    }
+    if (!isSafeSlug(slug)) {
+      return reply.code(404).send({ error: `词条不存在：${board}/${slug}` })
+    }
+    if (!getNote(board, slug)) {
+      return reply.code(404).send({ error: `词条不存在：${board}/${slug}` })
+    }
+    try {
+      removeNote(board, slug)
+    } catch (err) {
+      req.log.error(err)
+      return reply.code(500).send({ error: `删除失败：${err instanceof Error ? err.message : String(err)}` })
+    }
+    // 删除成功后后台自动 git 提交（不阻塞响应，失败仅警告）
+    commitNoteDeletion(board, slug)
+    return { ok: true }
   })
 }
