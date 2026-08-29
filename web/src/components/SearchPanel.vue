@@ -52,19 +52,23 @@ function close() {
   activeIndex.value = -1
 }
 
-/** 首次聚焦时惰性拉取索引；失败显示轻提示 */
+/** 首次聚焦时惰性拉取索引；失败显示轻提示。
+ * 加载中再次调用时共享等待同一个 Promise（getSearchIndex 自带缓存去重），
+ * 仅发起方管理 loading/error；并发 run 靠外层 seq 守卫只放行最新 query */
 async function ensureIndex(): Promise<boolean> {
-  if (loading.value) return false
-  loading.value = true
-  error.value = ''
+  const initiator = !loading.value
+  if (initiator) {
+    loading.value = true
+    error.value = ''
+  }
   try {
     await getSearchIndex()
     return true
   } catch (e) {
-    error.value = `搜索索引加载失败：${e instanceof Error ? e.message : String(e)}`
+    if (initiator) error.value = `搜索索引加载失败：${e instanceof Error ? e.message : String(e)}`
     return false
   } finally {
-    loading.value = false
+    if (initiator) loading.value = false
   }
 }
 
@@ -187,7 +191,7 @@ onBeforeUnmount(() => {
 
     <ul v-if="open && hasQuery" ref="listEl" class="search-drop">
       <li v-if="groups.length === 0 && !loading" class="drop-empty">
-        {{ loading ? '加载中…' : `未找到匹配「${query.trim()}」的词条` }}
+        未找到匹配「{{ query.trim() }}」的词条
       </li>
 
       <template v-for="g in groups" :key="g.board">
