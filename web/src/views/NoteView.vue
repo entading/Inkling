@@ -194,11 +194,14 @@ async function doDelete(): Promise<void> {
   const { board, slug } = note.value
   try {
     await api.deleteNote(board, slug)
-    // 索引/搜索/标签缓存失效 + 草稿清理，然后回板块页
+    // 索引/搜索/标签缓存失效 + 草稿清理；仅当用户仍在本词条页时才回板块页
+    // （删除请求在途时点「编辑」跳走的话，不把人从别的页面拽回来）
     invalidateSearchIndex()
     clearDraft(board, slug)
     confirmingDelete.value = false
-    void router.push(`/${board}`)
+    if (route.params.board === board && route.params.slug === slug) {
+      void router.push(`/${board}`)
+    }
   } catch (e) {
     deleteError.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -238,14 +241,23 @@ function scanMissingLinks(body: string): MissingTarget[] {
   return list
 }
 
-/** 等链接索引就绪后扫描（直接复用其缓存；先 setLinkIndex 保证解析用最新存在性数据） */
+/**
+ * 等链接索引就绪后扫描（直接复用其缓存；先 setLinkIndex 保证解析用最新存在性数据）。
+ * 竞态守卫同反向引用：发起时快照 board/slug，resolve 时已切走词条则丢弃结果，
+ * 防止缓存重建窗口期内把旧词条的失效链接写到新词条页面上。
+ */
 async function refreshMissingLinks(): Promise<void> {
+  const board = route.params.board
+  const slug = route.params.slug
   try {
     const notes = await getSearchIndex()
+    if (route.params.board !== board || route.params.slug !== slug) return
     setLinkIndex(notes)
     if (note.value) missingLinks.value = scanMissingLinks(note.value.body)
   } catch {
-    missingLinks.value = [] // 索引不可得时不提示，不影响阅读
+    if (route.params.board === board && route.params.slug === slug) {
+      missingLinks.value = [] // 索引不可得时不提示，不影响阅读
+    }
   }
 }
 </script>

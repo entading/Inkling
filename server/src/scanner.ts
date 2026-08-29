@@ -209,10 +209,14 @@ export function writeNote(board: Board, slug: string, content: string): NoteWith
 /**
  * 删除词条文件并立即从内存索引移除——与 writeNote「写后立即 upsert」对称，
  * 不依赖 chokidar 的 awaitWriteFinish 窗口（读接口 / 列表零延迟一致）。
+ * 用索引中的 filePath 定位：词条可能带子目录（手写 notes/<board>/sub/<slug>.md，
+ * slug 只是文件名），按 board/slug 重拼会 ENOENT 500，甚至误删根目录同名文件。
  * chokidar 随后的 unlink 触发内部 remove() 时有 existsSync 守卫，幂等安全。
  */
 export function removeNote(board: Board, slug: string): void {
-  const filePath = path.join(NOTES_DIR, board, `${slug}.md`)
+  const note = index.get(board)?.get(slug)
+  if (!note) return
+  const filePath = path.join(NOTES_DIR, note.filePath)
   fs.rmSync(filePath)
   index.get(board)?.delete(slug)
 }

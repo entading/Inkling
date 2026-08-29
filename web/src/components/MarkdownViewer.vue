@@ -31,6 +31,8 @@ onMounted(() => {
       /* 索引拉取失败：保持按存在渲染，不影响阅读 */
     })
   window.addEventListener('scroll', onScrollHidePreview, true)
+  // 窗口缩放同 scroll：链接矩形失效，预览卡停在过期坐标（M6 复检 1 的 sel-bar 同款问题）
+  window.addEventListener('resize', onScrollHidePreview)
 })
 
 // ---------- wiki 链接跳转（click 与 Enter 键盘委托共用） ----------
@@ -85,6 +87,8 @@ const previewEl = ref<HTMLElement | null>(null)
 const preview = ref<PreviewData | null>(null)
 
 let hoverTimer: number | undefined
+/** hover 代数：每次 mouseover/隐藏递增，findNote 是异步的，resolve 时代数已变说明鼠标早已移出，丢弃 */
+let hoverSeq = 0
 
 /** 摘要：正文第一个非空、非标题（# 开头）的行，粗剥行内标记后截约 120 字符 */
 function excerptOf(body: string): string {
@@ -127,6 +131,7 @@ function showPreview(rect: DOMRect): void {
 }
 
 function hidePreview(): void {
+  hoverSeq++
   window.clearTimeout(hoverTimer)
   hoverTimer = undefined
   previewVisible.value = false
@@ -140,10 +145,11 @@ function onMouseOver(e: MouseEvent): void {
   const board = el.getAttribute('data-board') ?? ''
   const slug = el.getAttribute('data-slug') ?? ''
   const rect = el.getBoundingClientRect()
+  const seq = ++hoverSeq
   window.clearTimeout(hoverTimer)
   hoverTimer = window.setTimeout(() => {
     void findNote(board as Board, slug).then((note) => {
-      if (!note) return // 目标刚被删除等：无数据不显示
+      if (!note || seq !== hoverSeq) return // 无数据，或等待索引期间鼠标已移出/换目标：不显示
       preview.value = {
         title: note.title,
         ipa: note.ipa,
@@ -177,6 +183,7 @@ function onScrollHidePreview(): void {
 onBeforeUnmount(() => {
   window.clearTimeout(hoverTimer)
   window.removeEventListener('scroll', onScrollHidePreview, true)
+  window.removeEventListener('resize', onScrollHidePreview)
 })
 
 // 切换词条（组件复用、body 替换）时旧预览卡主动隐藏，避免悬停在失效位置
@@ -301,6 +308,12 @@ watch(() => props.body, hidePreview)
 
 .note-body :deep(a.wiki-link:hover) {
   border-bottom-color: var(--color-accent);
+}
+
+/* 键盘 Tab 聚焦时叠加底色，长正文里焦点位置更醒目（outline 由全局 focus-visible 提供） */
+.note-body :deep(a.wiki-link:focus-visible) {
+  background: var(--color-accent-soft);
+  border-bottom-style: solid;
 }
 
 /* 全部板块未命中：红色虚线，点击跳新建页创建 stub */
