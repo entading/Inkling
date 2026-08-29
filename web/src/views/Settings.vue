@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { api, type ServerInfo } from '../api'
+import {
+  clearSavedVoice,
+  getSavedVoiceName,
+  getVoices,
+  isTtsSupported,
+  saveVoiceName,
+  speak,
+} from '../lib/tts'
 
 const info = ref<ServerInfo | null>(null)
 const loading = ref(true)
@@ -9,6 +17,44 @@ const error = ref('')
 /** 切换进行中：禁用开关，等待服务端后台完成 close→listen 后核对实际状态 */
 const pending = ref(false)
 const fail = ref('')
+
+// ---------- 发音（TTS）：纯浏览器端偏好，voice 存 localStorage 不走 /api/settings ----------
+
+const ttsSupported = isTtsSupported()
+const voices = ref<SpeechSynthesisVoice[]>([])
+const voicesLoading = ref(ttsSupported)
+/** 空字符串 = 未指定（默认美音 en-US 兜底），与 tts.pickVoice 的回落语义一致 */
+const selectedVoiceName = ref('')
+
+/** en-* 语音排前（排序稳定，组内保持系统顺序） */
+function sortVoices(list: SpeechSynthesisVoice[]): SpeechSynthesisVoice[] {
+  return [...list].sort((a, b) => {
+    const ae = a.lang.toLowerCase().startsWith('en') ? 0 : 1
+    const be = b.lang.toLowerCase().startsWith('en') ? 0 : 1
+    return ae - be
+  })
+}
+
+function onVoiceChange(): void {
+  if (selectedVoiceName.value) saveVoiceName(selectedVoiceName.value)
+  else clearSavedVoice()
+}
+
+function previewVoice(): void {
+  speak('Hello! This is a preview of the selected voice.')
+}
+
+if (ttsSupported) {
+  selectedVoiceName.value = getSavedVoiceName() ?? ''
+  void getVoices().then((list) => {
+    voices.value = sortVoices(list)
+    voicesLoading.value = false
+    // 已保存的 voice 在当前设备语音库中不存在时回落默认（pickVoice 同样会忽略它）
+    if (selectedVoiceName.value && !list.some((v) => v.name === selectedVoiceName.value)) {
+      selectedVoiceName.value = ''
+    }
+  })
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))
@@ -121,6 +167,37 @@ onMounted(load)
           <div><dt>监听地址</dt><dd>{{ info.host }}:{{ info.port }}</dd></div>
           <div><dt>访问地址</dt><dd>{{ info.urls.find(u => u.includes('localhost')) }}</dd></div>
         </dl>
+      </section>
+
+      <section v-if="ttsSupported" class="card">
+        <h2 class="card-title">发音（TTS）</h2>
+        <p class="desc">
+          词条朗读与选中朗读使用浏览器内置语音合成，默认美音（en-US）。
+          语音选择保存在当前浏览器，不同设备各自记忆。
+        </p>
+        <div class="tts-row">
+          <label class="tts-field">
+            <span class="tts-label">语音</span>
+            <select
+              v-model="selectedVoiceName"
+              class="tts-select"
+              :disabled="voicesLoading"
+              @change="onVoiceChange"
+            >
+              <option value="">默认（美音）</option>
+              <option v-for="v in voices" :key="v.name" :value="v.name">
+                {{ v.name }} ({{ v.lang }})
+              </option>
+            </select>
+          </label>
+          <button type="button" class="tts-preview" :disabled="voicesLoading" @click="previewVoice">
+            试听
+          </button>
+        </div>
+        <p v-if="voicesLoading" class="desc tts-note">加载语音列表…</p>
+        <p v-else-if="voices.length === 0" class="desc tts-note">
+          当前浏览器未提供任何语音，朗读将使用系统默认音色。
+        </p>
       </section>
     </template>
   </div>
@@ -283,6 +360,82 @@ onMounted(load)
 .kv dd {
   margin: 0;
   font-size: 0.9rem;
+}
+
+.tts-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.tts-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  flex: 1;
+}
+
+.tts-label {
+  flex: none;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+.tts-select {
+  flex: 1;
+  min-width: 0;
+  max-width: 420px;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.9rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.tts-select:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.tts-select:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.tts-select:disabled {
+  color: var(--color-text-secondary);
+  cursor: default;
+}
+
+.tts-preview {
+  flex: none;
+  padding: var(--space-2) var(--space-4);
+  font-size: 0.9rem;
+  color: var(--color-accent);
+  background: var(--color-surface);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.tts-preview:hover:not(:disabled) {
+  color: #fff;
+  background: var(--color-accent);
+}
+
+.tts-preview:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.tts-note {
+  margin-top: var(--space-3);
+  margin-bottom: 0;
 }
 
 .hint,
