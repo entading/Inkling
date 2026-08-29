@@ -53,9 +53,12 @@ export function getVoices(): Promise<SpeechSynthesisVoice[]> {
   const synth = window.speechSynthesis
   voicesPromise = new Promise((resolve) => {
     let settled = false
+    const onChanged = () => finish(synth.getVoices())
     const finish = (voices: SpeechSynthesisVoice[]) => {
       if (settled) return
       settled = true
+      // 超时兜底路径先行结束时，撤销尚未触发的 once 监听
+      synth.removeEventListener('voiceschanged', onChanged)
       if (voices.length > 0) voicesCache = voices
       voicesPromise = null
       resolve(voices)
@@ -66,7 +69,7 @@ export function getVoices(): Promise<SpeechSynthesisVoice[]> {
       return
     }
     // Chrome：语音列表异步就绪后触发 voiceschanged
-    synth.addEventListener('voiceschanged', () => finish(synth.getVoices()), { once: true })
+    synth.addEventListener('voiceschanged', onChanged, { once: true })
     // 兜底：个别环境不派发该事件，超时后取当前值（可能仍为空）
     window.setTimeout(() => finish(synth.getVoices()), 1500)
   })
@@ -100,7 +103,8 @@ export function speak(text: string): void {
   const synth = window.speechSynthesis
   synth.cancel()
   const utterance = new SpeechSynthesisUtterance(trimmed)
-  const voice = pickVoice(synth.getVoices())
+  // 优先用预热缓存：个别环境同步 getVoices() 可能滞后于已就绪的缓存
+  const voice = pickVoice(voicesCache ?? synth.getVoices())
   if (voice) {
     utterance.voice = voice
     utterance.lang = voice.lang
