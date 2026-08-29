@@ -28,14 +28,17 @@ const barX = ref(0)
 const barY = ref(0)
 const barEl = ref<HTMLElement | null>(null)
 
-/** 选区有效性：非空、落在 .note 内（标题/正文/反向引用面板皆在其中）、文本非纯空白 */
+/** 选区有效性：非空、起点与终点都落在 .note 内（标题/正文/反向引用面板皆在其中）、文本非纯空白。
+ * 起止都校验：从正文拖到侧边栏这类跨容器选区不应触发工具条、不应把词条外文本读出来 */
 function selectionInNote(): { rect: DOMRect } | null {
   const sel = window.getSelection()
   if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null
   if (!sel.toString().trim()) return null
-  const node = sel.anchorNode
-  const el = node instanceof Element ? node : (node?.parentElement ?? null)
-  if (!el || !el.closest('.note')) return null
+  const at = (node: Node | null): boolean => {
+    const el = node instanceof Element ? node : (node?.parentElement ?? null)
+    return !!el && !!el.closest('.note')
+  }
+  if (!at(sel.anchorNode) || !at(sel.focusNode)) return null
   return { rect: sel.getRangeAt(0).getBoundingClientRect() }
 }
 
@@ -86,8 +89,17 @@ function onPointerDown(e: PointerEvent): void {
   barVisible.value = false
 }
 
+/** 「朗读」按钮按下时预存选中文本：个别移动端浏览器不完全遵守 pointerdown 的
+ * preventDefault，选区在 click 前被折叠时靠它兜底 */
+let barSelText = ''
+
+function onBarPointerDown(): void {
+  barSelText = window.getSelection()?.toString() ?? ''
+}
+
 function onSpeakSelection(): void {
-  const text = window.getSelection()?.toString() ?? ''
+  const live = window.getSelection()?.toString() ?? ''
+  const text = live.trim() ? live : barSelText
   if (text.trim()) speak(text)
   barVisible.value = false
 }
@@ -97,6 +109,8 @@ onMounted(() => {
   document.addEventListener('selectionchange', onSelectionChange)
   // scroll 不冒泡，capture 才能一并捕获内部容器的滚动；滚动时跟随选区重定位
   window.addEventListener('scroll', onScroll, true)
+  // 窗口缩放不触发 selectionchange/scroll，工具条按新视口重定位
+  window.addEventListener('resize', onScroll)
   window.addEventListener('pointerdown', onPointerDown)
 })
 
@@ -104,6 +118,7 @@ onBeforeUnmount(() => {
   if (!ttsSupported) return
   document.removeEventListener('selectionchange', onSelectionChange)
   window.removeEventListener('scroll', onScroll, true)
+  window.removeEventListener('resize', onScroll)
   window.removeEventListener('pointerdown', onPointerDown)
 })
 
@@ -113,6 +128,8 @@ async function load() {
   loading.value = true
   error.value = ''
   backlinks.value = []
+  // 切换词条后旧选区可能失效（节点被替换）却不触发 selectionchange，工具条主动隐藏
+  barVisible.value = false
   try {
     note.value = await api.note(board, slug)
     // 反向引用并行加载，不阻塞正文；解析完成时若已切走词条则丢弃结果
@@ -201,11 +218,12 @@ watch(() => route.params, load)
         class="sel-bar"
         :style="{ left: `${barX}px`, top: `${barY}px` }"
       >
-        <!-- pointerdown.prevent：阻止按下时选区被折叠，保证 click 时仍能读到选中文本 -->
+        <!-- pointerdown.prevent：阻止按下时选区被折叠；onBarPointerDown 预存选中文本，
+             兜底个别移动端浏览器不完全遵守 preventDefault 的情况 -->
         <button
           type="button"
           class="sel-bar-btn"
-          @pointerdown.prevent
+          @pointerdown.prevent="onBarPointerDown"
           @click="onSpeakSelection"
         >
           朗读

@@ -185,7 +185,7 @@ onMounted(load)
               @change="onVoiceChange"
             >
               <option value="">默认（美音）</option>
-              <option v-for="v in voices" :key="v.name" :value="v.name">
+              <option v-for="(v, i) in voices" :key="`${i}-${v.name}`" :value="v.name">
                 {{ v.name }} ({{ v.lang }})
               </option>
             </select>
