@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ApiError, api, type Board } from '../api'
-import { BOARD_LABELS, BOARD_ORDER } from '../lib/search'
+import { BOARD_LABELS, BOARD_ORDER, invalidateSearchIndex } from '../lib/search'
 
 const route = useRoute()
 const router = useRouter()
@@ -65,6 +65,8 @@ async function submit() {
       tags,
       source: source.value.trim() || undefined,
     })
+    // 写盘成功，使前端搜索/标签缓存失效（/tags、搜索立即可见新词条）
+    invalidateSearchIndex()
     // 生成骨架后进入编辑页
     void router.push(`/v/${board.value}/${encodeURIComponent(s)}/edit`)
   } catch (e) {

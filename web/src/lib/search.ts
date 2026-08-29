@@ -37,6 +37,11 @@ export function getSearchIndex(): Promise<NoteDetail[]> {
   return indexPromise
 }
 
+/** 使全量索引缓存失效：新建/编辑词条写盘成功后调用，下次 getSearchIndex() 自动重新拉取 */
+export function invalidateSearchIndex(): void {
+  indexPromise = null
+}
+
 const BASE_KEYS: FuseOptionKey<NoteDetail>[] = ['title', 'tags']
 const BODY_KEYS: FuseOptionKey<NoteDetail>[] = ['title', 'tags', 'body']
 
