@@ -4,6 +4,7 @@ import { onBeforeRouteLeave, onBeforeRouteUpdate, RouterLink, useRoute } from 'v
 import MarkdownViewer from '../components/MarkdownViewer.vue'
 import { api, type Board, type NoteDetailRaw } from '../api'
 import { extractFrontmatter, stripFrontmatter } from '../lib/markdown'
+import { invalidateSearchIndex } from '../lib/search'
 
 const route = useRoute()
 
@@ -148,6 +149,8 @@ async function save() {
   saveError.value = ''
   try {
     await api.saveNote(board, slug, draft.value)
+    // 写盘成功，使前端搜索/标签缓存失效（/tags、搜索立即可见新内容）
+    invalidateSearchIndex()
     lastSaved.value = draft.value
     savedFrontmatter.value = extractFrontmatter(draft.value)
     saveState.value = 'saved'
