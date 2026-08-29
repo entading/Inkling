@@ -40,7 +40,7 @@ function onBodyClick(e: MouseEvent): void {
   const board = el.getAttribute('data-board') ?? ''
   const slug = el.getAttribute('data-slug') ?? ''
   if (!el.classList.contains('is-missing')) {
-    void router.push(`/v/${board}/${encodeURIComponent(slug)}`)
+    void router.push(`/v/${encodeURIComponent(board)}/${encodeURIComponent(slug)}`)
     return
   }
   const title = el.getAttribute('data-title') ?? ''
