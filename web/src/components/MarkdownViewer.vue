@@ -1,14 +1,57 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { render } from '../lib/markdown'
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { render, setLinkIndex } from '../lib/markdown'
+import { getSearchIndex } from '../lib/search'
 
-const props = defineProps<{ body: string }>()
+// interactive=false 用于编辑页预览：链接样式照常渲染（所见即所得），点击不导航
+const props = withDefaults(defineProps<{ body: string; interactive?: boolean }>(), {
+  interactive: true,
+})
 
-const html = computed(() => render(props.body))
+const router = useRouter()
+
+/** 链接索引就绪后 +1，触发 html 重新计算（未就绪时 [[...]] 按存在渲染，就绪后修正为缺失样式） */
+const linkVersion = ref(0)
+
+const html = computed(() => {
+  void linkVersion.value
+  return render(props.body)
+})
+
+onMounted(() => {
+  // 拉取/刷新链接存在性索引后重渲染（本地应用闪变亚秒级，可接受）
+  void getSearchIndex()
+    .then((notes) => {
+      setLinkIndex(notes)
+      linkVersion.value++
+    })
+    .catch(() => {
+      /* 索引拉取失败：保持按存在渲染，不影响阅读 */
+    })
+})
+
+/** 事件委托：wiki 链接 SPA 跳转；缺失目标跳新建页（stub 创建）。普通 md 链接不受影响 */
+function onBodyClick(e: MouseEvent): void {
+  if (!props.interactive) return
+  const el = (e.target as HTMLElement | null)?.closest('a.wiki-link')
+  if (!el) return
+  e.preventDefault()
+  const board = el.getAttribute('data-board') ?? ''
+  const slug = el.getAttribute('data-slug') ?? ''
+  if (!el.classList.contains('is-missing')) {
+    void router.push(`/v/${board}/${encodeURIComponent(slug)}`)
+    return
+  }
+  const title = el.getAttribute('data-title') ?? ''
+  void router.push(
+    `/new?board=${encodeURIComponent(board)}&slug=${encodeURIComponent(slug)}&title=${encodeURIComponent(title)}`,
+  )
+}
 </script>
 
 <template>
-  <div class="note-body" v-html="html" />
+  <div class="note-body" @click="onBodyClick" v-html="html" />
 </template>
 
 <style scoped>
@@ -86,6 +129,27 @@ const html = computed(() => render(props.body))
 
 .note-body :deep(a:hover) {
   border-bottom-color: var(--color-accent);
+}
+
+/* 双向链接（M5）：无 href，跳转由根节点事件委托处理 */
+.note-body :deep(a.wiki-link) {
+  color: var(--color-accent);
+  border-bottom: 1px dashed rgba(59, 130, 246, 0.5);
+  cursor: pointer;
+}
+
+.note-body :deep(a.wiki-link:hover) {
+  border-bottom-color: var(--color-accent);
+}
+
+/* 全部板块未命中：红色虚线，点击跳新建页创建 stub */
+.note-body :deep(a.wiki-link.is-missing) {
+  color: var(--color-danger);
+  border-bottom: 1px dashed var(--color-danger);
+}
+
+.note-body :deep(a.wiki-link.is-missing:hover) {
+  border-bottom-style: solid;
 }
 
 .note-body :deep(table) {
