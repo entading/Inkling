@@ -129,6 +129,9 @@ defineProps<{ notes: NoteMeta[] }>()
 
   .row-side {
     flex-wrap: wrap;
+    /* flex-shrink:0 的 flex item 按 max-content 计宽，3 个长标签时超出视口；
+    封顶后 flex-wrap 才会生效改为换行 */
+    max-width: 100%;
   }
 }
 </style>

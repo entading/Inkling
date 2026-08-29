@@ -153,9 +153,10 @@ function scrollTo(key: string) {
     flex: none;
   }
 
-  /* 横向字母条 sticky 在顶部，滚动定位时给分组标题留出不被遮挡的余量 */
+  /* 横向字母条 sticky 在顶部，滚动定位时给分组标题留出不被遮挡的余量；
+  56px = 字母条内容高约 36px（--space-2 8px×2 + 字母行高 + 1px border）+ 桌面经典滚动条约 18px + 余量 */
   .az-group {
-    scroll-margin-top: 44px;
+    scroll-margin-top: 56px;
   }
 }
 </style>
