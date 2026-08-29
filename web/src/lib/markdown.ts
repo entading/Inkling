@@ -86,6 +86,12 @@ md.inline.ruler.before('link', 'wiki', (state, silent) => {
   if (!m || m.index !== state.pos) return false
   const text = m[1].trim()
   if (!text) return false
+  // 显式形式板块与 slug 均须非空（[[x/]]、[[/x]]、[[/]] 为非法目标）→ 字面渲染；
+  // 判定须在 silent 分支之前：skipToken 的 pos 缓存要求校验与 tokenize 两分支结论一致
+  if (text.includes('/')) {
+    const sep = text.indexOf('/')
+    if (!text.slice(0, sep).trim() || !text.slice(sep + 1).trim()) return false
+  }
   state.pos = m.index + m[0].length
   if (silent) return true
   const target = parseWikiTarget(text)
