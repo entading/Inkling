@@ -301,7 +301,7 @@ onBeforeUnmount(() => {
   position: absolute;
   left: 0;
   right: 0;
-  z-index: 30;
+  z-index: var(--z-drop);
   max-height: 420px;
   overflow-y: auto;
   margin: var(--space-2) 0 0;

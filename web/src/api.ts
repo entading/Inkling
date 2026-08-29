@@ -86,6 +86,10 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content }),
     }),
+  deleteNote: (board: Board, slug: string) =>
+    fetchJson<{ ok: boolean }>(`/api/notes/${board}/${encodeURIComponent(slug)}`, {
+      method: 'DELETE',
+    }),
   recent: (limit = 10) => fetchJson<NoteMeta[]>(`/api/recent?limit=${limit}`),
   searchIndex: () => fetchJson<NoteDetail[]>('/api/search-index'),
   serverInfo: () => fetchJson<ServerInfo>('/api/server-info'),

@@ -137,7 +137,7 @@ function scrollTo(key: string) {
   .az-rail {
     position: sticky;
     top: 0;
-    z-index: 20;
+    z-index: var(--z-rail);
     /* 覆盖桌面 align-self:flex-start：竖排改横排后必须撑满容器宽度才能内部滚动 */
     align-self: stretch;
     flex-direction: row;

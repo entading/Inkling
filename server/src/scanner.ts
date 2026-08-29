@@ -205,3 +205,14 @@ export function writeNote(board: Board, slug: string, content: string): NoteWith
   if (!note) throw new Error(`写入后索引缺失：${board}/${slug}`)
   return note
 }
+
+/**
+ * 删除词条文件并立即从内存索引移除——与 writeNote「写后立即 upsert」对称，
+ * 不依赖 chokidar 的 awaitWriteFinish 窗口（读接口 / 列表零延迟一致）。
+ * chokidar 随后的 unlink 触发内部 remove() 时有 existsSync 守卫，幂等安全。
+ */
+export function removeNote(board: Board, slug: string): void {
+  const filePath = path.join(NOTES_DIR, board, `${slug}.md`)
+  fs.rmSync(filePath)
+  index.get(board)?.delete(slug)
+}
