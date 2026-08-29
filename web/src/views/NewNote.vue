@@ -26,6 +26,14 @@ onMounted(() => {
   // 支持板块页「新建」带当前板块进入（?board=xxx）
   const q = route.query.board
   if (typeof q === 'string' && isBoard(q)) board.value = q
+  // 支持 wiki 缺失链接跳入预填（?slug=&title=）；slug 预填视为已手动编辑，防 title blur 时推导覆盖
+  const qSlug = route.query.slug
+  if (typeof qSlug === 'string' && qSlug.trim()) {
+    slug.value = qSlug
+    slugTouched.value = true
+  }
+  const qTitle = route.query.title
+  if (typeof qTitle === 'string' && qTitle.trim()) title.value = qTitle
 })
 
 /** slug 由 title 推导：英文小写化，保留字母数字与中文，其余折叠为连字符 */

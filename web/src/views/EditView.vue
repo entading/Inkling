@@ -328,7 +328,7 @@ watch(() => route.params, load)
         />
       </div>
       <div class="pane pane-preview" :class="{ active: viewMode === 'preview' }">
-        <MarkdownViewer :body="previewSrc" />
+        <MarkdownViewer :body="previewSrc" :interactive="false" />
       </div>
     </div>
 

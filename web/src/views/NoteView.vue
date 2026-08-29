@@ -4,19 +4,33 @@ import { useRoute, RouterLink } from 'vue-router'
 import TagBadge from '../components/TagBadge.vue'
 import MarkdownViewer from '../components/MarkdownViewer.vue'
 import { api, type Board, type NoteDetailRaw } from '../api'
+import { getBacklinks, type Backlink } from '../lib/backlinks'
+import { BOARD_LABELS } from '../lib/search'
 
 const route = useRoute()
 const note = ref<NoteDetailRaw | null>(null)
 const error = ref('')
 const loading = ref(true)
+const backlinks = ref<Backlink[]>([])
 
 async function load() {
   const board = route.params.board as Board
   const slug = route.params.slug as string
   loading.value = true
   error.value = ''
+  backlinks.value = []
   try {
     note.value = await api.note(board, slug)
+    // 反向引用并行加载，不阻塞正文；解析完成时若已切走词条则丢弃结果
+    void getBacklinks(board, slug)
+      .then((list) => {
+        if (route.params.board === board && route.params.slug === slug) {
+          backlinks.value = list
+        }
+      })
+      .catch(() => {
+        backlinks.value = []
+      })
   } catch (e) {
     note.value = null
     error.value = e instanceof Error ? e.message : String(e)
@@ -55,6 +69,18 @@ watch(() => route.params, load)
       </header>
 
       <MarkdownViewer :body="note.body" />
+
+      <section v-if="backlinks.length > 0" class="backlinks" aria-label="反向引用">
+        <h2 class="backlinks-title">反向引用</h2>
+        <ul class="backlinks-list">
+          <li v-for="b in backlinks" :key="`${b.board}/${b.slug}`">
+            <RouterLink :to="`/v/${b.board}/${encodeURIComponent(b.slug)}`" class="backlink-link">
+              <span class="backlink-board">{{ BOARD_LABELS[b.board] }}</span>
+              <span class="backlink-title">{{ b.title }}</span>
+            </RouterLink>
+          </li>
+        </ul>
+      </section>
     </article>
   </div>
 </template>
@@ -167,6 +193,52 @@ watch(() => route.params, load)
 
 .note-body {
   margin-top: var(--space-6);
+}
+
+/* 反向引用面板（M5）：无引用时整节隐藏 */
+.backlinks {
+  margin-top: var(--space-7);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.backlinks-title {
+  margin: 0 0 var(--space-3);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.backlinks-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.backlink-link {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: 0.92rem;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.backlink-link:hover .backlink-title {
+  color: var(--color-accent);
+}
+
+.backlink-board {
+  flex-shrink: 0;
+  padding: 0 var(--space-2);
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
 }
 
 @media (max-width: 767px) {
