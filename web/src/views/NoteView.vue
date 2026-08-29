@@ -419,6 +419,8 @@ async function refreshMissingLinks(): Promise<void> {
   font-weight: 700;
   margin: 0 0 var(--space-3);
   letter-spacing: -0.01em;
+  /* 超长不可断词标题折行而非撑破（父级 .note-head-main 已有 min-width: 0） */
+  overflow-wrap: anywhere;
 }
 
 .title-row {

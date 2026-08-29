@@ -228,6 +228,8 @@ watch(() => props.body, hidePreview)
   line-height: 1.8;
   font-size: 1rem;
   color: var(--color-text);
+  /* 不可断词长内容防溢出；不影响 CJK 排版 */
+  overflow-wrap: anywhere;
 }
 
 .note-body :deep(h1) {
@@ -326,7 +328,10 @@ watch(() => props.body, hidePreview)
   border-bottom-style: solid;
 }
 
+/* 全端块级滚动容器：宽表格在容器内横向滚动，无需页面级横向滚动（移动端规则提升自 M3） */
 .note-body :deep(table) {
+  display: block;
+  overflow-x: auto;
   border-collapse: collapse;
   width: 100%;
   margin: 0.8em 0;
@@ -422,12 +427,6 @@ watch(() => props.body, hidePreview)
 @media (max-width: 767px) {
   .note-body {
     font-size: 0.95rem;
-  }
-
-  /* 宽表格在窄屏转为块级滚动容器，避免横向撑破页面 */
-  .note-body :deep(table) {
-    display: block;
-    overflow-x: auto;
   }
 }
 </style>
