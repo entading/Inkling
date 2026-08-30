@@ -100,7 +100,7 @@ async function start(): Promise<void> {
   watcher = watch()
   console.log(`已扫描 notes/ 目录：${NOTES_DIR}`)
   await app.listen({ host: LOCAL_HOST, port: PORT })
-  console.log(`EN_tool 服务端已启动：http://localhost:${PORT}`)
+  console.log(`Inkling 服务端已启动：http://localhost:${PORT}`)
   console.log(`板块：${Object.values(BOARD_LABELS).join('、')}`)
 }
 

@@ -39,15 +39,15 @@ const router = createRouter({
 
 router.afterEach((to) => {
   if (to.name === 'note') {
-    document.title = `EN_tool · ${String(to.params.slug)}`
+    document.title = `Inkling · ${String(to.params.slug)}`
   } else if (to.name === 'note-edit') {
-    document.title = `EN_tool · 编辑 ${String(to.params.slug)}`
+    document.title = `Inkling · 编辑 ${String(to.params.slug)}`
   } else if (to.name === 'new-note') {
-    document.title = 'EN_tool · 新建词条'
+    document.title = 'Inkling · 新建词条'
   } else if (to.name === 'tag-detail') {
-    document.title = `EN_tool · #${String(to.params.tag)}`
+    document.title = `Inkling · #${String(to.params.tag)}`
   } else {
-    document.title = 'EN_tool'
+    document.title = 'Inkling'
   }
 })
 
