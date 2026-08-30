@@ -78,6 +78,9 @@ defineProps<{ notes: NoteMeta[] }>()
 .row-title {
   font-weight: 500;
   font-size: 0.98rem;
+  /* 超长不可断词标题折行而非撑破：否则 min-content 沿 flex 链（span 子项 min-width:auto）
+  顶开 .note-row 造成文档级横滚（同阅读页 .note-title 的 M1 同款处理） */
+  overflow-wrap: anywhere;
 }
 
 .row-ipa {
@@ -85,6 +88,7 @@ defineProps<{ notes: NoteMeta[] }>()
   font-family: var(--font-ipa);
   font-style: italic;
   font-size: 0.88rem;
+  overflow-wrap: anywhere;
 }
 
 .row-source {
@@ -93,6 +97,10 @@ defineProps<{ notes: NoteMeta[] }>()
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* 弹性填充项：行宽不足时由 source 独自吸收挤压（截断省略），
+  避免标题/ipa 被挤出断词；超长标题则被钳到剩余宽度内折行 */
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .row-side {
