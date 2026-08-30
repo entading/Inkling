@@ -485,6 +485,9 @@ async function refreshMissingLinks(): Promise<void> {
   font-family: var(--font-ipa);
   font-style: italic;
   font-size: 1.05rem;
+  /* 超长不可断 IPA token 折行而非撑破（M1 .note-title / M5 .missing-banner 同款；
+     .ipa 为普通块级，非 flex item，anywhere 单独生效即可） */
+  overflow-wrap: anywhere;
 }
 
 .note-tags {
