@@ -384,7 +384,10 @@ watch(() => props.body, hidePreview)
 }
 
 .wiki-preview-ipa {
-  flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--font-ipa);
   font-style: italic;
   font-size: 0.82rem;

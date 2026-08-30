@@ -361,6 +361,8 @@ onBeforeUnmount(() => {
 .item-title {
   font-size: 0.93rem;
   font-weight: 500;
+  /* 超长不可断 title 折行而非撑破（M3 .row-title 同款），防下拉行出现内部横滚 */
+  overflow-wrap: anywhere;
 }
 
 .item-ipa {
@@ -368,6 +370,8 @@ onBeforeUnmount(() => {
   font-family: var(--font-ipa);
   font-style: italic;
   font-size: 0.82rem;
+  /* 超长不可断 IPA token 折行而非撑破（M3 .row-ipa 同款） */
+  overflow-wrap: anywhere;
 }
 
 .drop-empty {
