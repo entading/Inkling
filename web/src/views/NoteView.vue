@@ -200,7 +200,9 @@ async function doDelete(): Promise<void> {
     invalidateSearchIndex()
     clearDraft(board, slug)
     confirmingDelete.value = false
-    if (route.params.board === board && route.params.slug === slug) {
+    // 仅当仍在该词条阅读页才回板块页：编辑路由与阅读页的 params 完全相同，
+    // 只比 params 无法区分，须同时校验路由名才是「阅读页」语义
+    if (route.name === 'note' && route.params.board === board && route.params.slug === slug) {
       void router.push(`/${board}`)
     }
   } catch (e) {

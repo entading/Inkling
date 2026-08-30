@@ -130,10 +130,50 @@ function showPreview(rect: DOMRect): void {
   void nextTick(() => placePreview(rect))
 }
 
+// ---------- 预览卡「走廊」判定（M7 测试 E-04）：慢速移向卡片时卡片不被间隙 mouseout 提前隐藏 ----------
+
+let hideTimer: number | undefined
+let corridorListener: ((e: PointerEvent) => void) | null = null
+
+/** 指针是否落在预览卡四周走廊内（扩 24px，覆盖链接与卡片间 8px 间隙及翻转偏移） */
+function nearCardZone(x: number, y: number): boolean {
+  const el = previewEl.value
+  if (!el) return false
+  const r = el.getBoundingClientRect()
+  const pad = 24
+  return x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad
+}
+
+/** 延迟隐藏：指针在走廊内（如链接与卡片的间隙上）暂不隐藏，留出移入卡片的时间；
+ * 指针离开走廊而不在卡片上则立即隐藏，另有 500ms 兜底定时器防 pointermove 未触达 */
+function deferHide(): void {
+  window.clearTimeout(hideTimer)
+  hideTimer = window.setTimeout(hidePreview, 500)
+  if (corridorListener) return
+  corridorListener = (e: PointerEvent) => {
+    if (!previewVisible.value) return
+    if (nearCardZone(e.clientX, e.clientY)) return
+    if (e.target instanceof Node && previewEl.value?.contains(e.target)) return
+    hidePreview()
+  }
+  window.addEventListener('pointermove', corridorListener)
+}
+
+/** 取消延迟隐藏：进入卡片时调用（卡片保持显示），也由 hidePreview 统一清理 */
+function clearCorridor(): void {
+  window.clearTimeout(hideTimer)
+  hideTimer = undefined
+  if (corridorListener) {
+    window.removeEventListener('pointermove', corridorListener)
+    corridorListener = null
+  }
+}
+
 function hidePreview(): void {
   hoverSeq++
   window.clearTimeout(hoverTimer)
   hoverTimer = undefined
+  clearCorridor()
   previewVisible.value = false
   preview.value = null
 }
@@ -172,6 +212,12 @@ function onMouseOut(e: MouseEvent): void {
     // 链接内部子元素间移动：不算移出
     if (from.contains(to)) return
   }
+  // 慢速移向卡片时指针先落在链接与卡片间的间隙上（mouseout 目标非卡片）：
+  // 指针在卡片走廊内则延迟隐藏，让指针自然移入卡片；否则立即隐藏
+  if (previewEl.value && nearCardZone(e.clientX, e.clientY)) {
+    deferHide()
+    return
+  }
   hidePreview()
 }
 
@@ -182,6 +228,7 @@ function onScrollHidePreview(): void {
 
 onBeforeUnmount(() => {
   window.clearTimeout(hoverTimer)
+  clearCorridor()
   window.removeEventListener('scroll', onScrollHidePreview, true)
   window.removeEventListener('resize', onScrollHidePreview)
 })
@@ -207,6 +254,7 @@ watch(() => props.body, hidePreview)
       ref="previewEl"
       class="wiki-preview"
       :style="{ left: `${previewX}px`, top: `${previewY}px` }"
+      @mouseenter="clearCorridor"
       @mouseleave="hidePreview"
     >
       <div class="wiki-preview-head">
