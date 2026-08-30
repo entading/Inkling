@@ -7,8 +7,8 @@ import { boardRoutes } from './router'
   <div class="layout">
     <aside class="sidebar">
       <RouterLink to="/" class="brand">
-        <span class="brand-mark">E</span>
-        <span class="brand-name">EN_tool</span>
+        <span class="brand-mark">I</span>
+        <span class="brand-name">Inkling</span>
       </RouterLink>
 
       <nav class="nav">
