@@ -76,6 +76,18 @@ export function parseWikiTarget(text: string): WikiTarget {
 }
 
 /**
+ * [[...]] 书写文本的词法合法性：显式形式（含 /）板块与 slug 均须非空，
+ * [[x/]]、[[/x]]、[[/]] 等非法目标渲染为字面文本。
+ * inline rule（字面渲染判定）与 NoteView 失效链接扫描（字面目标不计入提示条）共用，
+ * 词法规则只写这一份，防止渲染与提示条语义漂移。
+ */
+export function isLegalWikiText(text: string): boolean {
+  if (!text.includes('/')) return true
+  const sep = text.indexOf('/')
+  return !!text.slice(0, sep).trim() && !!text.slice(sep + 1).trim()
+}
+
+/**
  * [[...]] 内联规则：产出 <a class="wiki-link">（不写 href，跳转由 MarkdownViewer 事件委托）。
  * 注册在 link 之前，[[...]] 先于普通链接语法被认领；inline 解析天然不进入 code fence / 行内代码。
  * 契约：返回 true 时必须推进 state.pos（silent 校验模式同样要求，见 markdown-it parser_inline）。
@@ -85,13 +97,9 @@ md.inline.ruler.before('link', 'wiki', (state, silent) => {
   const m = WIKI_LINK_RE.exec(state.src)
   if (!m || m.index !== state.pos) return false
   const text = m[1].trim()
-  if (!text) return false
-  // 显式形式板块与 slug 均须非空（[[x/]]、[[/x]]、[[/]] 为非法目标）→ 字面渲染；
+  // 空目标与非法显式目标（isLegalWikiText）→ 字面渲染；
   // 判定须在 silent 分支之前：skipToken 的 pos 缓存要求校验与 tokenize 两分支结论一致
-  if (text.includes('/')) {
-    const sep = text.indexOf('/')
-    if (!text.slice(0, sep).trim() || !text.slice(sep + 1).trim()) return false
-  }
+  if (!text || !isLegalWikiText(text)) return false
   state.pos = m.index + m[0].length
   if (silent) return true
   const target = parseWikiTarget(text)

@@ -5,7 +5,7 @@ import TagBadge from '../components/TagBadge.vue'
 import MarkdownViewer from '../components/MarkdownViewer.vue'
 import { api, type Board, type NoteDetailRaw } from '../api'
 import { getBacklinks, stripCodeText, type Backlink } from '../lib/backlinks'
-import { parseWikiTarget, setLinkIndex, WIKI_LINK_RE } from '../lib/markdown'
+import { isLegalWikiText, parseWikiTarget, setLinkIndex, WIKI_LINK_RE } from '../lib/markdown'
 import { BOARD_LABELS, getSearchIndex, invalidateSearchIndex } from '../lib/search'
 import { isTtsSupported, speak } from '../lib/tts'
 
@@ -232,6 +232,8 @@ function scanMissingLinks(body: string): MissingTarget[] {
   const list: MissingTarget[] = []
   for (const m of stripCodeText(body).matchAll(MISSING_SCAN_RE)) {
     const display = m[1].trim()
+    // 非法目标（[[x/]]、[[/x]] 等）渲染为字面文本，与 inline rule 同一校验，不计入提示条
+    if (!display || !isLegalWikiText(display)) continue
     const target = parseWikiTarget(display)
     if (target.resolved || !target.slug) continue
     const key = `${target.board}/${target.slug}`
@@ -576,7 +578,9 @@ async function refreshMissingLinks(): Promise<void> {
   cursor: default;
 }
 
-/* 失效链接提示条（M7）：复用 EditView banner 的危险色变体模式 */
+/* 失效链接提示条（M7）：复用 EditView banner 的危险色变体模式。
+   不可断词超长 display（如超长 slug）折行而非撑破（M1 .note-title 同款）；
+   overflow-wrap 可继承，.missing-target 内文本直接生效 */
 .missing-banner {
   display: flex;
   align-items: baseline;
@@ -589,6 +593,7 @@ async function refreshMissingLinks(): Promise<void> {
   background: var(--color-danger-soft);
   border: 1px solid var(--color-danger);
   border-radius: var(--radius-md);
+  overflow-wrap: anywhere;
 }
 
 .missing-target {
