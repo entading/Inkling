@@ -27,16 +27,7 @@ npm run dev
 
 ## 数据
 
-手写 Markdown 文件即数据，存放在 `notes/` 下四个板块目录：
-
-| 板块 | 目录 |
-|---|---|
-| 词汇 Vocab | `notes/vocab/` |
-| 短语 Phrase | `notes/phrase/` |
-| 长难句 Sentence | `notes/sentence/` |
-| 语法 Grammar | `notes/grammar/` |
-
-一个词条 = 一个 md 文件，文件名即 slug（板块内唯一，可含子目录）。frontmatter 字段：`title`（缺失兜底为文件名）、`ipa`、`tags`、`source`、`created`、`updated`；无 frontmatter 时以文件名兜底。运行期间往目录丢入新 md 文件会自动收录，无需重启。正文格式完全自由。
+手写 Markdown 文件即数据，存放在 `notes/` 下四个板块目录（词汇 `vocab/`、短语 `phrase/`、长难句 `sentence/`、语法 `grammar/`）。一词条 = 一个 md 文件，文件名即 slug；运行期间往目录丢入新 md 文件会自动收录，无需重启；正文格式完全自由。frontmatter 字段约定见 `AGENTS.md`「数据模型」。
 
 ## 命令
 
