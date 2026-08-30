@@ -54,7 +54,8 @@ function placeBar(rect: DOMRect): void {
   x = Math.min(Math.max(x, m), window.innerWidth - w - m)
   let y = rect.top - h - m
   if (y < m) y = rect.bottom + m
-  y = Math.min(y, window.innerHeight - h - m)
+  // 选区滚出视口上缘时翻转分支的 y 可为负，钳在顶边距内避免工具条半截出画
+  y = Math.max(m, Math.min(y, window.innerHeight - h - m))
   barX.value = x
   barY.value = y
 }
