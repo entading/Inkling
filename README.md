@@ -1,6 +1,17 @@
 # EN_tool
 
-个人英语学习知识沉淀库：Markdown 文件即数据，检索快、可互联、界面简洁美观。
+个人英语学习知识沉淀库：Markdown 文件即数据，检索快、可互联、界面简洁美观。定位是**个人知识沉淀库，不是背单词软件**。
+
+## 功能一览
+
+- **四大板块**：词汇 Vocab（支持 IPA 音标）、短语 Phrase、长难句 Sentence、语法 Grammar
+- **检索**：首页全局搜索（模糊 + 精确优先、键盘导航、全文开关）、板块内就地过滤、词汇页 A–Z 字典序目录、自由标签云
+- **录入**：新建页小表单生成骨架、编辑页分屏实时渲染（Ctrl+S 保存）、拖入/粘贴 md、编辑暂停 3 秒自动草稿（防丢失）、frontmatter 丢失软保护
+- **互联**：双向链接 `[[词条]]` 渲染与跳转、反向引用面板、失效链接提示条与 stub 一键创建
+- **发音**：IPA 音标渲染、词条朗读、选中文本朗读（浏览器 TTS，默认美音，可切换语音）
+- **移动端**：响应式布局（767px 断点）、底部导航、横向 A–Z 条、阅览体验优先
+- **局域网访问**：设置页一键开启，手机扫码访问（默认仅本机，重启后关闭）
+- **版本管理**：git 全程跟踪笔记，删除词条后台自动提交（误删可救）
 
 ## 快速开始
 
@@ -9,7 +20,7 @@ npm install
 npm run dev
 ```
 
-- 前端：http://localhost:5173
+- 前端：http://localhost:5173（**浏览器访问必须用 localhost**，127.0.0.1:5173 会被拒绝）
 - 服务端 API：http://127.0.0.1:3000（Vite 将 `/api` 代理到此处）
 
 ## 数据
@@ -23,9 +34,15 @@ npm run dev
 | 长难句 Sentence | `notes/sentence/` |
 | 语法 Grammar | `notes/grammar/` |
 
-一个词条 = 一个 md 文件，文件名即 slug（板块内唯一）。支持 frontmatter 字段：`title`、`ipa`、`tags`、`source`、`created`、`updated`；无 frontmatter 时以文件名兜底。运行期间往目录丢入新 md 文件会自动收录，无需重启。
+一个词条 = 一个 md 文件，文件名即 slug（板块内唯一，可含子目录）。frontmatter 字段：`title`（缺失兜底为文件名）、`ipa`、`tags`、`source`、`created`、`updated`；无 frontmatter 时以文件名兜底。运行期间往目录丢入新 md 文件会自动收录，无需重启。正文格式完全自由。
 
 ## 命令
 
 - `npm run dev`：启动服务端（tsx watch）与前端（vite）
-- `npm run build`：构建 server 与 web
+- `npm run build`：构建 server 与 web（类型检查 + 打包）
+
+## 文档
+
+- `产品设计方案.md`：唯一设计权威（已确认决策、数据模型、路线图）
+- `AGENTS.md`：项目上下文记忆文件（进度、API 一览、偏离事实记录、工作流约定）
+- `docs/v1.0.0/`：首个版本的开发记录（M1–M7 全维度测试报告）
