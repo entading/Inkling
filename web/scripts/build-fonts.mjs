@@ -59,8 +59,10 @@ for (const w of weights) {
     return `url(${q}/fonts/serif/${w.weight}/${p.replace(/^\.\//, '')}${q})`
   })
   blocks.push(`/* weight ${w.weight} —— ${w.file}（cn-font-split 分片，unicode-range 按需加载） */\n${rewritten.trim()}\n`)
-  // 中间产物 result.css（含时间戳注释）已被合并进 fonts.css，从产物目录移除避免部署死重
-  rmSync(resolve(outDir, cssName))
+  // 清理工具中间产物：result.css（已并入 fonts.css）与 index.proto（内部分片元数据），产物目录只留 woff2
+  for (const extra of readdirSync(outDir).filter((f) => !f.endsWith('.woff2'))) {
+    rmSync(resolve(outDir, extra))
+  }
   const woff2 = readdirSync(outDir).filter((f) => f.endsWith('.woff2'))
   console.log(`weight ${w.weight}: ${woff2.length} woff2 片`)
 }
