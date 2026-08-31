@@ -87,7 +87,7 @@ onMounted(async () => {
 }
 
 .page-title {
-  font-size: 1.4rem;
+  font-size: var(--text-xl);
   font-weight: 600;
   margin: 0;
   letter-spacing: -0.01em;
@@ -100,7 +100,7 @@ onMounted(async () => {
 
 .page-meta {
   color: var(--color-text-secondary);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
 }
 
 .tag-group {
@@ -109,7 +109,7 @@ onMounted(async () => {
 
 .tag-group-title {
   margin: 0 0 var(--space-3);
-  font-size: 1.05rem;
+  font-size: var(--text-lg);
   font-weight: 600;
 }
 

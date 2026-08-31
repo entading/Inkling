@@ -247,7 +247,7 @@ onBeforeUnmount(() => {
 .search-input {
   width: 100%;
   padding: 14px 76px 14px 44px;
-  font-size: 1rem;
+  font-size: var(--text-md);
   font-family: inherit;
   color: var(--color-text);
   background: var(--color-surface);
@@ -273,7 +273,7 @@ onBeforeUnmount(() => {
   top: 50%;
   transform: translateY(-50%);
   padding: 3px 10px;
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   font-family: inherit;
   color: var(--color-text-secondary);
   background: var(--color-bg);
@@ -297,7 +297,7 @@ onBeforeUnmount(() => {
 .search-error {
   margin: var(--space-2) 0 0;
   max-width: 560px;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--color-danger);
 }
 
@@ -326,17 +326,17 @@ onBeforeUnmount(() => {
 
 .group-label {
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
 }
 
 .group-total {
   color: var(--color-text-secondary);
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
 }
 
 .group-more {
   margin-left: auto;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   color: var(--color-accent);
   text-decoration: none;
 }
@@ -359,7 +359,7 @@ onBeforeUnmount(() => {
 }
 
 .item-title {
-  font-size: 0.93rem;
+  font-size: var(--text-base);
   font-weight: 500;
   /* 超长不可断 title 折行而非撑破（M3 .row-title 同款），防下拉行出现内部横滚 */
   overflow-wrap: anywhere;
@@ -369,7 +369,7 @@ onBeforeUnmount(() => {
   color: var(--color-text-secondary);
   font-family: var(--font-ipa);
   font-style: italic;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   /* 超长不可断 IPA token 折行而非撑破（M3 .row-ipa 同款） */
   overflow-wrap: anywhere;
 }
@@ -377,7 +377,7 @@ onBeforeUnmount(() => {
 .drop-empty {
   padding: var(--space-4) var(--space-3);
   color: var(--color-text-secondary);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   text-align: center;
 }
 
@@ -392,7 +392,7 @@ onBeforeUnmount(() => {
 
   .search-input {
     padding: 12px 72px 12px 40px;
-    font-size: 0.98rem;
+    font-size: var(--text-md);
   }
 
   .search-icon {

@@ -183,7 +183,7 @@ async function submit() {
 }
 
 .page-title {
-  font-size: 1.4rem;
+  font-size: var(--text-xl);
   font-weight: 600;
   margin: 0 0 var(--space-2);
   letter-spacing: -0.01em;
@@ -192,7 +192,7 @@ async function submit() {
 .page-desc {
   margin: 0;
   color: var(--color-text-secondary);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
 }
 
 .form-card {
@@ -210,7 +210,7 @@ async function submit() {
 .form-label {
   display: block;
   margin-bottom: var(--space-2);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   font-weight: 500;
   color: var(--color-text-secondary);
 }
@@ -218,7 +218,7 @@ async function submit() {
 .form-input {
   width: 100%;
   padding: 9px 12px;
-  font-size: 0.95rem;
+  font-size: var(--text-base);
   font-family: inherit;
   color: var(--color-text);
   background: var(--color-bg);
@@ -239,13 +239,13 @@ async function submit() {
 
 .form-hint {
   margin: var(--space-1) 0 0;
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   color: var(--color-text-secondary);
 }
 
 .form-error {
   margin: var(--space-2) 0 0;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--color-danger);
 }
 
@@ -259,7 +259,7 @@ async function submit() {
 
 .cancel-link {
   color: var(--color-text-secondary);
-  font-size: 0.92rem;
+  font-size: var(--text-base);
   text-decoration: none;
 }
 
@@ -269,7 +269,7 @@ async function submit() {
 
 .submit-btn {
   padding: var(--space-2) var(--space-5);
-  font-size: 0.92rem;
+  font-size: var(--text-base);
   font-family: inherit;
   border: none;
   border-radius: var(--radius-md);

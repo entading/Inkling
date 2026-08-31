@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import NoteList from '../components/NoteList.vue'
 import AZIndex from '../components/AZIndex.vue'
+import EmptyState from '../components/EmptyState.vue'
 import { api, type Board, type NoteDetail, type NoteMeta } from '../api'
 import { getSearchIndex, searchBoard } from '../lib/search'
 
@@ -114,7 +115,13 @@ watch(() => route.query, syncFromRoute)
 
     <p v-if="error" class="error">加载失败：{{ error }}</p>
     <p v-else-if="loading" class="hint">加载中…</p>
-    <p v-else-if="query.trim() && filtered.length === 0" class="hint">没有匹配「{{ query.trim() }}」的词条</p>
+    <EmptyState
+      v-else-if="query.trim() && filtered.length === 0"
+      :title="`没有匹配「${query.trim()}」的词条`"
+      description="换个关键词试试，或清除搜索查看全部词条。"
+    >
+      <button type="button" class="empty-clear" @click="query = ''">清除搜索</button>
+    </EmptyState>
     <AZIndex v-else-if="board === 'vocab'" :notes="filtered" />
     <NoteList v-else :notes="filtered" />
   </div>
@@ -134,7 +141,7 @@ watch(() => route.query, syncFromRoute)
 }
 
 .board-title {
-  font-size: 1.4rem;
+  font-size: var(--text-xl);
   font-weight: 600;
   margin: 0;
   letter-spacing: -0.01em;
@@ -142,7 +149,7 @@ watch(() => route.query, syncFromRoute)
 
 .board-meta {
   color: var(--color-text-secondary);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
 }
 
 .board-header-right {
@@ -155,7 +162,7 @@ watch(() => route.query, syncFromRoute)
 .new-link {
   flex-shrink: 0;
   padding: var(--space-1) var(--space-3);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--color-text-secondary);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -188,7 +195,7 @@ watch(() => route.query, syncFromRoute)
 .board-search-input {
   width: 100%;
   padding: 10px 44px 10px 38px;
-  font-size: 0.95rem;
+  font-size: var(--text-base);
   font-family: inherit;
   color: var(--color-text);
   background: var(--color-surface);
@@ -214,7 +221,7 @@ watch(() => route.query, syncFromRoute)
   top: 50%;
   transform: translateY(-50%);
   padding: 2px 10px;
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   font-family: inherit;
   color: var(--color-text-secondary);
   background: var(--color-bg);
@@ -238,6 +245,23 @@ watch(() => route.query, syncFromRoute)
 .hint,
 .error {
   color: var(--color-text-secondary);
+}
+
+/* 空态 CTA：清除搜索还原列表（语义与描述互补，见实施记录） */
+.empty-clear {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-base);
+  color: var(--color-accent);
+  background: var(--color-surface);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.empty-clear:hover {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
 }
 
 .error {

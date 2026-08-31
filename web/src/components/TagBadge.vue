@@ -1,11 +1,16 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import { tagPairIndex } from '../lib/tagColor'
 
-defineProps<{ tag: string }>()
+const props = defineProps<{ tag: string }>()
+
+/** hash(tag)%8 → tokens.css 的 .tag-pair-N 应用类（底色/文字色），hover 叠加 --tag-hover-overlay */
+const pairClass = computed(() => `tag-pair-${tagPairIndex(props.tag)}`)
 </script>
 
 <template>
-  <RouterLink :to="`/tags/${encodeURIComponent(tag)}`" class="tag-badge">
+  <RouterLink :to="`/tags/${encodeURIComponent(tag)}`" class="tag-badge" :class="pairClass">
     {{ tag }}
   </RouterLink>
 </template>
@@ -15,17 +20,15 @@ defineProps<{ tag: string }>()
   display: inline-block;
   padding: 2px 10px;
   border-radius: var(--radius-full);
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   line-height: 1.5;
   white-space: nowrap;
   text-decoration: none;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
+/* hover 统一强化：叠加 --tag-hover-overlay 极淡覆盖（浅色压暗/深色提亮），不动文字色 */
 .tag-badge:hover {
-  background: var(--color-accent);
-  color: var(--color-on-accent);
+  background-image: linear-gradient(var(--tag-hover-overlay), var(--tag-hover-overlay));
 }
 </style>

@@ -93,7 +93,7 @@ function scrollTo(key: string) {
 .az-letter {
   width: 24px;
   padding: 2px 0;
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   font-family: inherit;
   color: var(--color-accent);
   background: transparent;
@@ -122,7 +122,7 @@ function scrollTo(key: string) {
 
 .az-group-title {
   margin: 0 0 var(--space-3);
-  font-size: 1.05rem;
+  font-size: var(--text-lg);
   font-weight: 600;
   color: var(--color-accent);
 }

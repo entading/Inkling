@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import EmptyState from './EmptyState.vue'
 import TagBadge from './TagBadge.vue'
 import type { NoteMeta } from '../api'
 
@@ -27,7 +28,13 @@ defineProps<{ notes: NoteMeta[] }>()
       </div>
     </li>
   </ul>
-  <p v-else class="empty">暂无词条</p>
+  <EmptyState
+    v-else
+    title="暂无词条"
+    description="这里还没有内容，新建一条开始沉淀。"
+  >
+    <RouterLink to="/new" class="empty-cta">＋ 新建词条</RouterLink>
+  </EmptyState>
 </template>
 
 <style scoped>
@@ -77,7 +84,7 @@ defineProps<{ notes: NoteMeta[] }>()
 
 .row-title {
   font-weight: 500;
-  font-size: 0.98rem;
+  font-size: var(--text-md);
   /* 超长不可断词标题折行而非撑破：否则 min-content 沿 flex 链（span 子项 min-width:auto）
   顶开 .note-row 造成文档级横滚（同阅读页 .note-title 的 M1 同款处理） */
   overflow-wrap: anywhere;
@@ -87,13 +94,13 @@ defineProps<{ notes: NoteMeta[] }>()
   color: var(--color-text-secondary);
   font-family: var(--font-ipa);
   font-style: italic;
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
 
 .row-source {
   color: var(--color-text-secondary);
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -112,19 +119,27 @@ defineProps<{ notes: NoteMeta[] }>()
 
 .row-board {
   color: var(--color-text-secondary);
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
 }
 
 .row-updated {
   color: var(--color-text-secondary);
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
 }
 
-.empty {
-  color: var(--color-text-secondary);
-  text-align: center;
-  padding: var(--space-7) 0;
+.empty-cta {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-base);
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.empty-cta:hover {
+  opacity: 0.88;
 }
 
 @media (max-width: 767px) {

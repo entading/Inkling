@@ -365,7 +365,7 @@ watch(() => route.params, load)
   flex-shrink: 0;
   color: var(--color-text-secondary);
   text-decoration: none;
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   transition: color 0.15s ease;
 }
 
@@ -374,7 +374,7 @@ watch(() => route.params, load)
 }
 
 .edit-title {
-  font-size: 1.05rem;
+  font-size: var(--text-lg);
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -389,7 +389,7 @@ watch(() => route.params, load)
 }
 
 .save-state {
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--color-text-secondary);
 }
 
@@ -403,7 +403,7 @@ watch(() => route.params, load)
 
 .save-btn {
   padding: var(--space-1) var(--space-5);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   font-family: inherit;
   border: none;
   border-radius: var(--radius-md);
@@ -434,7 +434,7 @@ watch(() => route.params, load)
 
 .chip {
   padding: 3px 14px;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   font-family: inherit;
   color: var(--color-text-secondary);
   background: var(--color-surface);
@@ -461,7 +461,7 @@ watch(() => route.params, load)
   gap: var(--space-2);
   margin: 0 0 var(--space-3);
   padding: var(--space-2) var(--space-3);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--color-text);
   background: var(--color-accent-soft);
   border: 1px solid var(--color-accent);
@@ -473,7 +473,7 @@ watch(() => route.params, load)
   border: none;
   background: none;
   color: var(--color-text-secondary);
-  font-size: 1rem;
+  font-size: var(--text-md);
   line-height: 1;
   cursor: pointer;
 }
@@ -493,7 +493,7 @@ watch(() => route.params, load)
   border: none;
   background: none;
   color: var(--color-danger);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   cursor: pointer;
   text-decoration: underline;
@@ -547,7 +547,7 @@ watch(() => route.params, load)
   width: 100%;
   padding: var(--space-4);
   font-family: ui-monospace, SFMono-Regular, Consolas, 'Cascadia Mono', 'Courier New', monospace;
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   line-height: 1.7;
   color: var(--color-text);
   background: var(--color-surface);
@@ -573,7 +573,7 @@ watch(() => route.params, load)
 
 .drop-error {
   margin: var(--space-2) 0 0;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--color-danger);
 }
 
