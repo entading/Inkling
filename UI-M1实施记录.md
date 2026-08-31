@@ -105,6 +105,16 @@
 - [x] **深色交互态补充**：TagBadge hover 实测 `background: rgb(96,165,250)`（accent-400）+ `color: rgb(11,18,32)`（--color-on-accent 深字），令牌收敛在 hover 交互下同样正确。
 - [x] **测试残留清理**：临时词条的 localStorage 编辑草稿（`en_tool:draft:vocab:m1-dark-check`，M4 草稿功能所存，实施时未察觉）已在复检中清除；IAB 内 5173/4173 两源的主题偏好已恢复 system/清空，localStorage 零测试残留。
 
+## 审查（第三轮，2026-08-31，独立审查会话）
+
+对已提交状态独立复验，**结论：通过验收**。核实范围与结果：
+
+- [x] **代码核对**：tokens.css（P0 字体接线 + html 画布底 + 表单控件 inherit + 全部令牌与深色覆盖 + reduced-motion 守卫）、theme.ts（key/取值/非法值容错/单例/过渡类生命周期）、index.html 内联防闪脚本（位置与容错）、Settings 外观卡（radiogroup/roving tabindex/独立于服务端状态渲染）逐文件核对，与设计文档 §1 §2 及负向清单一致。
+- [x] **提交与文档**：`efccdeb` 18 文件全在 web/ 与 lockfile、`55d929e` 未触碰 notes/；§12 已标注；AGENTS「主题实现铁律」回写到位。
+- [x] **独立实测（browser-use）**：`npm run build` 通过且产物 hash 与复检一致（index-CVNL-oA4.css / index-D9oFnQrr.js）；12 页面深色走查全绿（bg=#101418、零横滚、零加载错误）；body/button/input 计算字体同栈（Arial 分叉消除）；主题三态与刷新持久化；键盘 ← 切换 dark→light 且 aria 同步；搜索下拉深色命中 surface/border/accent-soft 令牌；375×812 移动端三项抽查全过；preview 生产构建设深色刷新，domcontentloaded 最早可观测帧即 dark（无白闪）。
+- [x] **发现并纠正 1 处记录偏差**：复检「localStorage 零测试残留」不准确——5173 源存有 `en_tool:draft:vocab:abandon`（abandon 编辑页走查所写），内容与磁盘逐字节一致、无数据风险；审查会话已清除并复验归零。
+- [△] **审查环境插曲（非应用缺陷）**：审查会话中 IAB 渲染管道一度停滞（rAF 600ms 不跳帧），定位点击超时与个别 computed 读数陈旧均由此产生；reload 后一切一致。切换逻辑本身经页面内事件触发 + 刷新双路径验证无误。
+
 ## 已知限制
 
 1. **dev 模式样式注入闪烁属正常**：Vite dev 下样式经 JS 注入，首帧可能有短暂样式跳动；防白闪结论以 preview 生产构建为准（已验）。
