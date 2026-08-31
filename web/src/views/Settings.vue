@@ -274,7 +274,7 @@ onMounted(load)
 }
 
 .page-title {
-  font-size: 1.4rem;
+  font-size: var(--text-xl);
   font-weight: 600;
   margin: 0;
   letter-spacing: -0.01em;
@@ -290,7 +290,7 @@ onMounted(load)
 
 .card-title {
   margin: 0 0 var(--space-3);
-  font-size: 1.1rem;
+  font-size: var(--text-lg);
   font-weight: 600;
 }
 
@@ -305,7 +305,7 @@ onMounted(load)
 
 .theme-opt {
   padding: var(--space-1) var(--space-4);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   color: var(--color-text-secondary);
   background: transparent;
   border: none;
@@ -333,7 +333,7 @@ onMounted(load)
 .desc {
   margin: 0 0 var(--space-3);
   color: var(--color-text-secondary);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   line-height: 1.6;
 }
 
@@ -391,7 +391,7 @@ onMounted(load)
 }
 
 .switch-state {
-  font-size: 0.95rem;
+  font-size: var(--text-base);
   font-weight: 500;
 }
 
@@ -405,7 +405,7 @@ onMounted(load)
 }
 
 .url-link {
-  font-size: 0.95rem;
+  font-size: var(--text-base);
   color: var(--color-accent);
   text-decoration: none;
   border-bottom: 1px solid var(--wiki-underline);
@@ -426,7 +426,7 @@ onMounted(load)
 .path {
   display: block;
   padding: var(--space-3);
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   color: var(--color-text);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
@@ -450,12 +450,12 @@ onMounted(load)
 .kv dt {
   flex: none;
   color: var(--color-text-secondary);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
 }
 
 .kv dd {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--text-base);
 }
 
 .tts-row {
@@ -475,7 +475,7 @@ onMounted(load)
 
 .tts-label {
   flex: none;
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   color: var(--color-text-secondary);
 }
 
@@ -484,7 +484,7 @@ onMounted(load)
   min-width: 0;
   max-width: 420px;
   padding: var(--space-2) var(--space-3);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   color: var(--color-text);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -510,7 +510,7 @@ onMounted(load)
 .tts-preview {
   flex: none;
   padding: var(--space-2) var(--space-4);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   color: var(--color-accent);
   background: var(--color-surface);
   border: 1px solid var(--color-accent);

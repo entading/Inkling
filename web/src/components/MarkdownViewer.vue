@@ -272,30 +272,47 @@ watch(() => props.body, hidePreview)
 
 <style scoped>
 /* 样式迁自 NoteView.vue（M4 抽组件），阅读页与编辑页预览共用 */
+/* 正文衬线层（§3）：整体衬线 + 17px + 1.8 行高；UI 层与 .ipa 不在此组件内，不受影响 */
 .note-body {
+  font-family: var(--font-serif);
+  font-size: var(--text-body);
   line-height: 1.8;
-  font-size: 1rem;
+  letter-spacing: 0.01em;
   color: var(--color-text);
+  /* 中西文混排自动加间距（Chromium 140+ 渐进增强，旧浏览器整行忽略） */
+  text-autospace: normal;
+  /* 断行兜底：段首孤行/段尾寡行至少 2 行（可继承至 p/li） */
+  orphans: 2;
+  widows: 2;
   /* 不可断词长内容防溢出；不影响 CJK 排版 */
   overflow-wrap: anywhere;
 }
 
+/* 标题沿用现有字距（§3：letter-spacing 只调正文，不进标题），serif 字形下标题断行取平衡 */
 .note-body :deep(h1) {
-  font-size: 1.35rem;
+  font-size: var(--text-xl);
   margin: 1.6em 0 0.6em;
+  text-wrap: balance;
+  letter-spacing: normal;
 }
 
 .note-body :deep(h2) {
-  font-size: 1.15rem;
+  font-size: var(--text-lg);
   margin: 1.5em 0 0.5em;
+  text-wrap: balance;
+  letter-spacing: normal;
 }
 
+/* h3 与正文同字号、靠加粗分层（阶梯内无 1.05 的档位，映射见实施记录） */
 .note-body :deep(h3) {
-  font-size: 1.05rem;
+  font-size: var(--text-body);
+  text-wrap: balance;
+  letter-spacing: normal;
 }
 
 .note-body :deep(p) {
-  margin: 0.6em 0;
+  margin: 0.9em 0;
+  text-wrap: pretty;
 }
 
 .note-body :deep(ul),
@@ -313,8 +330,17 @@ watch(() => props.body, hidePreview)
   padding: 0.4em 1em;
   border-left: 3px solid var(--color-accent);
   color: var(--color-text-secondary);
-  background: var(--color-bg);
+  background: var(--color-surface-2);
+  /* 引用块多为英文例句，不需要 1.8 的呼吸感（§3） */
+  line-height: 1.6;
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+/* 行内代码 / 代码块 / 键盘输入 / 样本输出：保持等宽栈，不被正文衬线污染 */
+.note-body :deep(code),
+.note-body :deep(kbd),
+.note-body :deep(samp) {
+  font-family: var(--font-mono);
 }
 
 .note-body :deep(code) {
@@ -326,6 +352,7 @@ watch(() => props.body, hidePreview)
 }
 
 .note-body :deep(pre) {
+  font-family: var(--font-mono);
   padding: var(--space-4);
   border-radius: var(--radius-md);
   background: var(--color-bg);
@@ -339,31 +366,35 @@ watch(() => props.body, hidePreview)
   padding: 0;
 }
 
+/* 衬线字形下边框下划线会压字形：md/wiki 链接统一迁移到真下划线，可调 offset 与粗细 */
 .note-body :deep(a) {
   color: var(--color-accent);
-  text-decoration: none;
-  border-bottom: 1px solid var(--wiki-underline);
+  text-decoration: underline;
+  text-decoration-color: var(--wiki-underline);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
 }
 
 .note-body :deep(a:hover) {
-  border-bottom-color: var(--color-accent);
+  text-decoration-color: var(--color-accent);
 }
 
 /* 双向链接（M5）：无 href，跳转由根节点事件委托处理 */
 .note-body :deep(a.wiki-link) {
   color: var(--color-accent);
-  border-bottom: 1px dashed var(--wiki-underline-missing);
+  text-decoration-style: dashed;
+  text-decoration-color: var(--wiki-underline-missing);
   cursor: pointer;
 }
 
 .note-body :deep(a.wiki-link:hover) {
-  border-bottom-color: var(--color-accent);
+  text-decoration-color: var(--color-accent);
 }
 
 /* 键盘 Tab 聚焦时叠加底色，长正文里焦点位置更醒目（outline 由全局 focus-visible 提供） */
 .note-body :deep(a.wiki-link:focus-visible) {
   background: var(--color-accent-soft);
-  border-bottom-style: solid;
+  text-decoration-style: solid;
 }
 
 /* 全部板块未命中：红色虚线，点击跳新建页创建 stub */
@@ -424,7 +455,7 @@ watch(() => props.body, hidePreview)
 
 .wiki-preview-title {
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: var(--text-base);
   color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -438,7 +469,7 @@ watch(() => props.body, hidePreview)
   white-space: nowrap;
   font-family: var(--font-ipa);
   font-style: italic;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   color: var(--color-text-secondary);
 }
 
@@ -451,7 +482,7 @@ watch(() => props.body, hidePreview)
 
 .wiki-preview-tag {
   padding: 0 var(--space-2);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   line-height: 1.7;
   color: var(--color-accent);
   background: var(--color-accent-soft);
@@ -460,13 +491,13 @@ watch(() => props.body, hidePreview)
 
 .wiki-preview-source {
   margin-top: var(--space-1);
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   color: var(--color-text-secondary);
 }
 
 .wiki-preview-excerpt {
   margin: var(--space-2) 0 0;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   line-height: 1.6;
   color: var(--color-text-secondary);
   display: -webkit-box;
@@ -477,7 +508,7 @@ watch(() => props.body, hidePreview)
 
 @media (max-width: 767px) {
   .note-body {
-    font-size: 0.95rem;
+    font-size: var(--text-base);
   }
 }
 </style>

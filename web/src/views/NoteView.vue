@@ -420,7 +420,7 @@ async function refreshMissingLinks(): Promise<void> {
 }
 
 .note-title {
-  font-size: 1.7rem;
+  font-size: var(--text-2xl);
   font-weight: 700;
   margin: 0 0 var(--space-3);
   letter-spacing: -0.01em;
@@ -469,7 +469,7 @@ async function refreshMissingLinks(): Promise<void> {
 .sel-bar-btn {
   display: block;
   padding: 6px 18px;
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   color: var(--color-accent);
   background: transparent;
   border: none;
@@ -486,7 +486,7 @@ async function refreshMissingLinks(): Promise<void> {
   color: var(--color-text-secondary);
   font-family: var(--font-ipa);
   font-style: italic;
-  font-size: 1.05rem;
+  font-size: var(--text-lg);
   /* 超长不可断 IPA token 折行而非撑破（M1 .note-title / M5 .missing-banner 同款；
      .ipa 为普通块级，非 flex item，anywhere 单独生效即可） */
   overflow-wrap: anywhere;
@@ -515,12 +515,12 @@ async function refreshMissingLinks(): Promise<void> {
 
 .note-meta dt {
   color: var(--color-text-secondary);
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
 }
 
 .note-meta dd {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   color: var(--color-text);
 }
 
@@ -533,7 +533,7 @@ async function refreshMissingLinks(): Promise<void> {
 
 .edit-link {
   padding: var(--space-1) var(--space-4);
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   line-height: 1.6;
   color: var(--color-text-secondary);
   background: var(--color-surface);
@@ -551,7 +551,7 @@ async function refreshMissingLinks(): Promise<void> {
 /* 删除按钮：常态与「编辑」同款，hover 变危险色；确认态实底红 */
 .delete-btn {
   padding: var(--space-1) var(--space-4);
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   line-height: 1.6;
   font-family: inherit;
   color: var(--color-text-secondary);
@@ -593,7 +593,7 @@ async function refreshMissingLinks(): Promise<void> {
   gap: var(--space-1) var(--space-2);
   margin: var(--space-5) 0 0;
   padding: var(--space-2) var(--space-3);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--color-text);
   background: var(--color-danger-soft);
   border: 1px solid var(--color-danger);
@@ -617,7 +617,7 @@ async function refreshMissingLinks(): Promise<void> {
   border: none;
   background: none;
   color: var(--color-text-secondary);
-  font-size: 1rem;
+  font-size: var(--text-md);
   line-height: 1;
   cursor: pointer;
 }
@@ -628,7 +628,7 @@ async function refreshMissingLinks(): Promise<void> {
 
 .delete-error {
   margin: var(--space-3) 0 0;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--color-danger);
 }
 
@@ -641,7 +641,7 @@ async function refreshMissingLinks(): Promise<void> {
 
 .backlinks-title {
   margin: 0 0 var(--space-3);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   font-weight: 600;
   color: var(--color-text-secondary);
 }
@@ -659,7 +659,7 @@ async function refreshMissingLinks(): Promise<void> {
   display: flex;
   align-items: baseline;
   gap: var(--space-2);
-  font-size: 0.92rem;
+  font-size: var(--text-base);
   color: var(--color-text);
   text-decoration: none;
 }
@@ -671,7 +671,7 @@ async function refreshMissingLinks(): Promise<void> {
 .backlink-board {
   flex-shrink: 0;
   padding: 0 var(--space-2);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   color: var(--color-text-secondary);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
@@ -684,7 +684,7 @@ async function refreshMissingLinks(): Promise<void> {
   }
 
   .note-title {
-    font-size: 1.4rem;
+    font-size: var(--text-xl);
   }
 
   .note-meta {

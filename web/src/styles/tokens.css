@@ -57,6 +57,8 @@ textarea {
   --text-lg: 1.1rem;
   --text-xl: 1.4rem;
   --text-2xl: 1.7rem;
+  /* 正文（阅读排版 §3）：17px，仅 .note-body 使用 */
+  --text-body: 1.0625rem;
 
   /* 板块个性色（主色 + 柔和底；M2' 起在组件中使用） */
   --board-vocab: #3b82f6;
@@ -67,6 +69,19 @@ textarea {
   --board-sentence-soft: #fffbeb;
   --board-grammar: #16a34a;
   --board-grammar-soft: #f0fdf4;
+
+  /* 标签 8 色柔和对（§5）：bg=柔和底 / c=strong 字，按 hash(tag)%8 稳定取用；
+     顺序 blue/teal/amber/green/violet/rose/cyan/orange。深色变体见下方 dark 层 */
+  --tag-0-bg: #eff6ff; --tag-0-c: #2563eb;
+  --tag-1-bg: #f0fdfa; --tag-1-c: #0d9488;
+  --tag-2-bg: #fffbeb; --tag-2-c: #b45309;
+  --tag-3-bg: #f0fdf4; --tag-3-c: #16a34a;
+  --tag-4-bg: #f5f3ff; --tag-4-c: #7c3aed;
+  --tag-5-bg: #fff1f2; --tag-5-c: #e11d48;
+  --tag-6-bg: #ecfeff; --tag-6-c: #0e7490;
+  --tag-7-bg: #fff7ed; --tag-7-c: #c2410c;
+  /* 标签 hover 强化：叠一层极淡覆盖（浅色压暗、深色提亮），不遮文字色 */
+  --tag-hover-overlay: rgba(31, 41, 55, 0.06);
 
   /* 圆角 */
   --radius-sm: 6px;
@@ -94,6 +109,15 @@ textarea {
     sans-serif;
   --font-ipa:
     'Noto Sans', 'Noto Sans IPA', 'Noto Sans SC', var(--font-sans);
+  /* 正文衬线（§3 定稿：屏显优化英文栈 + 思源宋体分片 webfont，分片见 styles/fonts.css） */
+  --font-serif:
+    'Charter', 'Bitstream Charter', 'Cambria', 'Constantia', Georgia,
+    'Noto Serif SC Web', 'Source Han Serif SC', 'Noto Serif SC', 'Songti SC',
+    SimSun, serif;
+  /* 代码等宽栈（.note-body 内 code/pre/kbd/samp 用，防衬线污染） */
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
 
   /* 布局 */
   --sidebar-width: 224px;
@@ -145,6 +169,18 @@ textarea {
   --board-sentence-soft: rgba(251, 191, 36, 0.12);
   --board-grammar: #4ade80;
   --board-grammar-soft: rgba(74, 222, 128, 0.12);
+
+  /* 标签 8 色深色变体：bg 低透明度 rgba、c 提亮一档（400 档），策略与板块深色变体一致 */
+  --tag-0-bg: rgba(96, 165, 250, 0.14);  --tag-0-c: #60a5fa;
+  --tag-1-bg: rgba(45, 212, 191, 0.12);  --tag-1-c: #2dd4bf;
+  --tag-2-bg: rgba(251, 191, 36, 0.12);  --tag-2-c: #fbbf24;
+  --tag-3-bg: rgba(74, 222, 128, 0.12);  --tag-3-c: #4ade80;
+  --tag-4-bg: rgba(167, 139, 250, 0.14); --tag-4-c: #a78bfa;
+  --tag-5-bg: rgba(251, 113, 133, 0.14); --tag-5-c: #fb7185;
+  --tag-6-bg: rgba(34, 211, 238, 0.12);  --tag-6-c: #22d3ee;
+  --tag-7-bg: rgba(251, 146, 60, 0.14);  --tag-7-c: #fb923c;
+  /* 深色下「加深」改为轻微提亮（暗底上压暗会失去对比） */
+  --tag-hover-overlay: rgba(255, 255, 255, 0.06);
 }
 
 /* 主题切换瞬间的全局平滑过渡：仅 .theme-transitioning 存续期间生效（由 theme.ts
@@ -167,3 +203,14 @@ button:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
+
+/* 标签 8 色应用类（M2'）：tagColor.ts 以 hash(tag)%8 稳定映射到 tag-pair-N，
+   供 TagBadge / Tags 云标签引用；基类不自带底色/文字色，避免 scoped 特异性压过这里 */
+.tag-pair-0 { background: var(--tag-0-bg); color: var(--tag-0-c); }
+.tag-pair-1 { background: var(--tag-1-bg); color: var(--tag-1-c); }
+.tag-pair-2 { background: var(--tag-2-bg); color: var(--tag-2-c); }
+.tag-pair-3 { background: var(--tag-3-bg); color: var(--tag-3-c); }
+.tag-pair-4 { background: var(--tag-4-bg); color: var(--tag-4-c); }
+.tag-pair-5 { background: var(--tag-5-bg); color: var(--tag-5-c); }
+.tag-pair-6 { background: var(--tag-6-bg); color: var(--tag-6-c); }
+.tag-pair-7 { background: var(--tag-7-bg); color: var(--tag-7-c); }

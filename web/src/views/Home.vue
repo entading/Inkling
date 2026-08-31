@@ -1,9 +1,18 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import Icon, { type IconName } from '../components/Icon.vue'
 import NoteList from '../components/NoteList.vue'
 import SearchPanel from '../components/SearchPanel.vue'
-import { api, type BoardInfo, type NoteMeta } from '../api'
+import { api, type Board, type BoardInfo, type NoteMeta } from '../api'
+
+/** 板块卡图标（§4）：chip 底/图标/计数走 --board-* 个性色，卡片其余部分保持中性色 */
+const BOARD_ICONS: Record<Board, IconName> = {
+  vocab: 'book',
+  phrase: 'link',
+  sentence: 'align-left',
+  grammar: 'graduation-cap',
+}
 
 const boards = ref<BoardInfo[]>([])
 const recent = ref<NoteMeta[]>([])
@@ -79,7 +88,9 @@ onBeforeUnmount(() => {
           :key="b.board"
           :to="`/${b.board}`"
           class="board-card"
+          :class="`board-${b.board}`"
         >
+          <span class="board-chip"><Icon :name="BOARD_ICONS[b.board]" :size="20" /></span>
           <span class="board-label">{{ b.label }}</span>
           <span class="board-count">{{ b.count }}<span class="unit">条</span></span>
         </RouterLink>
@@ -114,7 +125,7 @@ onBeforeUnmount(() => {
 /* 主按钮（强调色实心），桌面与移动端均可见（设计 5.1 新建词条快捷入口） */
 .new-btn {
   padding: var(--space-2) var(--space-4);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   border-radius: var(--radius-md);
   background: var(--color-accent);
   color: var(--color-on-accent);
@@ -128,7 +139,7 @@ onBeforeUnmount(() => {
 }
 
 .title {
-  font-size: 1.6rem;
+  font-size: var(--text-2xl);
   font-weight: 600;
   margin: var(--space-2) 0 var(--space-6);
   letter-spacing: -0.01em;
@@ -142,7 +153,7 @@ onBeforeUnmount(() => {
 .menu-btn {
   width: 34px;
   height: 34px;
-  font-size: 1.1rem;
+  font-size: var(--text-lg);
   line-height: 1;
   color: var(--color-text-secondary);
   background: var(--color-surface);
@@ -175,7 +186,7 @@ onBeforeUnmount(() => {
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
   color: var(--color-text);
-  font-size: 0.92rem;
+  font-size: var(--text-base);
   text-decoration: none;
 }
 
@@ -189,7 +200,7 @@ onBeforeUnmount(() => {
 }
 
 .section-title {
-  font-size: 1.1rem;
+  font-size: var(--text-lg);
   font-weight: 600;
   margin: var(--space-7) 0 var(--space-4);
 }
@@ -220,20 +231,65 @@ onBeforeUnmount(() => {
   transform: translateY(-2px);
 }
 
+/* 板块个性色（§5）：仅板块卡的 chip 与计数使用 --board-*，侧栏/按钮/链接仍统一宁静蓝 */
+.board-chip {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  display: grid;
+  place-items: center;
+}
+
+.board-vocab .board-chip {
+  background: var(--board-vocab-soft);
+  color: var(--board-vocab);
+}
+
+.board-phrase .board-chip {
+  background: var(--board-phrase-soft);
+  color: var(--board-phrase);
+}
+
+.board-sentence .board-chip {
+  background: var(--board-sentence-soft);
+  color: var(--board-sentence);
+}
+
+.board-grammar .board-chip {
+  background: var(--board-grammar-soft);
+  color: var(--board-grammar);
+}
+
+.board-vocab .board-count {
+  color: var(--board-vocab);
+}
+
+.board-phrase .board-count {
+  color: var(--board-phrase);
+}
+
+.board-sentence .board-count {
+  color: var(--board-sentence);
+}
+
+.board-grammar .board-count {
+  color: var(--board-grammar);
+}
+
 .board-label {
   font-weight: 600;
-  font-size: 1rem;
+  font-size: var(--text-md);
 }
 
 .board-count {
   color: var(--color-accent);
-  font-size: 1.5rem;
+  font-size: var(--text-xl);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 .unit {
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   font-weight: 400;
   color: var(--color-text-secondary);
   margin-left: 2px;
@@ -241,7 +297,7 @@ onBeforeUnmount(() => {
 
 .eyebrow {
   color: var(--color-text-secondary);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   margin: 0 0 var(--space-2);
 }
 
@@ -259,7 +315,7 @@ onBeforeUnmount(() => {
   }
 
   .title {
-    font-size: 1.35rem;
+    font-size: var(--text-xl);
     margin-bottom: var(--space-4);
   }
 

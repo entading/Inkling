@@ -1,6 +1,18 @@
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
+import Icon, { type IconName } from './components/Icon.vue'
 import { boardRoutes } from './router'
+
+/** 导航图标（§4）：侧栏与底部导航共用一份映射，颜色随 RouterLink 的 currentColor 变化 */
+const NAV_ICONS: Record<string, IconName> = {
+  '/': 'home',
+  '/vocab': 'book',
+  '/phrase': 'link',
+  '/sentence': 'align-left',
+  '/grammar': 'graduation-cap',
+  '/tags': 'tag',
+  '/settings': 'settings',
+}
 </script>
 
 <template>
@@ -12,7 +24,10 @@ import { boardRoutes } from './router'
       </RouterLink>
 
       <nav class="nav">
-        <RouterLink to="/" class="nav-item" exact-active-class="active">首页</RouterLink>
+        <RouterLink to="/" class="nav-item" exact-active-class="active">
+          <Icon :name="NAV_ICONS['/']" :size="16" />
+          <span>首页</span>
+        </RouterLink>
         <RouterLink
           v-for="r in boardRoutes"
           :key="r.path"
@@ -20,10 +35,17 @@ import { boardRoutes } from './router'
           class="nav-item"
           active-class="active"
         >
-          {{ r.label }}
+          <Icon :name="NAV_ICONS[r.path]" :size="16" />
+          <span>{{ r.label }}</span>
         </RouterLink>
-        <RouterLink to="/tags" class="nav-item" active-class="active">标签</RouterLink>
-        <RouterLink to="/settings" class="nav-item" active-class="active">设置</RouterLink>
+        <RouterLink to="/tags" class="nav-item" active-class="active">
+          <Icon :name="NAV_ICONS['/tags']" :size="16" />
+          <span>标签</span>
+        </RouterLink>
+        <RouterLink to="/settings" class="nav-item" active-class="active">
+          <Icon :name="NAV_ICONS['/settings']" :size="16" />
+          <span>设置</span>
+        </RouterLink>
       </nav>
 
       <p class="sidebar-foot">Markdown 文件即数据</p>
@@ -35,7 +57,10 @@ import { boardRoutes } from './router'
 
     <!-- 移动端底部导航：替代桌面侧边栏（设计 3.3），标签/设置收进首页右上角菜单 -->
     <nav class="bottom-nav" aria-label="移动端主导航">
-      <RouterLink to="/" class="bottom-item" exact-active-class="active">首页</RouterLink>
+      <RouterLink to="/" class="bottom-item" exact-active-class="active">
+        <Icon :name="NAV_ICONS['/']" :size="20" />
+        <span>首页</span>
+      </RouterLink>
       <RouterLink
         v-for="r in boardRoutes"
         :key="r.path"
@@ -43,7 +68,8 @@ import { boardRoutes } from './router'
         class="bottom-item"
         active-class="active"
       >
-        {{ r.label }}
+        <Icon :name="NAV_ICONS[r.path]" :size="20" />
+        <span>{{ r.label }}</span>
       </RouterLink>
     </nav>
   </div>
@@ -92,7 +118,7 @@ import { boardRoutes } from './router'
 
 .brand-name {
   font-weight: 600;
-  font-size: 1.05rem;
+  font-size: var(--text-lg);
   letter-spacing: 0.01em;
 }
 
@@ -104,12 +130,14 @@ import { boardRoutes } from './router'
 }
 
 .nav-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
   color: var(--color-text-secondary);
   text-decoration: none;
-  font-size: 0.95rem;
+  font-size: var(--text-base);
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
@@ -126,7 +154,7 @@ import { boardRoutes } from './router'
 
 .sidebar-foot {
   margin-top: auto;
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   color: var(--color-text-secondary);
   padding: 0 var(--space-3);
 }
@@ -166,9 +194,11 @@ import { boardRoutes } from './router'
   .bottom-item {
     flex: 1;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    font-size: 0.78rem;
+    gap: 2px;
+    font-size: var(--text-xs);
     color: var(--color-text-secondary);
     text-decoration: none;
     transition: color 0.15s ease;

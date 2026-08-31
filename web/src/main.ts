@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import './styles/tokens.css'
+import './styles/fonts.css'
 import { useTheme } from './lib/theme'
 import App from './App.vue'
 import router from './router'

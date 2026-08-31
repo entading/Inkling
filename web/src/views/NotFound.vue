@@ -31,7 +31,7 @@ import { RouterLink } from 'vue-router'
 }
 
 .title {
-  font-size: 1.3rem;
+  font-size: var(--text-xl);
   margin: 0;
 }
 

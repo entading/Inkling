@@ -2,6 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { aggregateTags, type TagCount } from '../lib/search'
+import EmptyState from '../components/EmptyState.vue'
+import { tagPairIndex } from '../lib/tagColor'
 
 const tags = ref<TagCount[]>([])
 const loading = ref(true)
@@ -38,7 +40,11 @@ function fontSize(count: number): string {
 
     <p v-if="error" class="error">加载失败：{{ error }}</p>
     <p v-else-if="loading" class="hint">加载中…</p>
-    <p v-else-if="tags.length === 0" class="hint">暂无标签，给词条加上标签后会出现在这里。</p>
+    <EmptyState
+      v-else-if="tags.length === 0"
+      title="暂无标签"
+      description="给词条加上标签后会出现在这里。"
+    />
 
     <div v-else class="tag-cloud">
       <RouterLink
@@ -46,6 +52,7 @@ function fontSize(count: number): string {
         :key="t.tag"
         :to="`/tags/${encodeURIComponent(t.tag)}`"
         class="cloud-tag"
+        :class="`tag-pair-${tagPairIndex(t.tag)}`"
         :style="{ fontSize: fontSize(t.count) }"
         :title="`${t.count} 条词条`"
       >
@@ -70,7 +77,7 @@ function fontSize(count: number): string {
 }
 
 .page-title {
-  font-size: 1.4rem;
+  font-size: var(--text-xl);
   font-weight: 600;
   margin: 0;
   letter-spacing: -0.01em;
@@ -78,7 +85,7 @@ function fontSize(count: number): string {
 
 .page-meta {
   color: var(--color-text-secondary);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
 }
 
 .tag-cloud {
@@ -88,22 +95,21 @@ function fontSize(count: number): string {
   gap: var(--space-2) var(--space-3);
 }
 
+/* 底色/文字色由 tokens.css 的 .tag-pair-N 提供（hash 稳定取色，与 TagBadge 同源） */
 .cloud-tag {
   display: inline-flex;
   align-items: baseline;
   gap: 4px;
   padding: 2px 12px;
   border-radius: var(--radius-full);
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
   line-height: 1.8;
   text-decoration: none;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
+/* hover 与 TagBadge 同策略：叠加 --tag-hover-overlay 强化，不动文字色 */
 .cloud-tag:hover {
-  background: var(--color-accent);
-  color: var(--color-on-accent);
+  background-image: linear-gradient(var(--tag-hover-overlay), var(--tag-hover-overlay));
 }
 
 .cloud-count {
