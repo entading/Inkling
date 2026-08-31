@@ -142,6 +142,20 @@
 
 - [x] 本轮全程 rAF 正常（51 帧/300ms），未遇渲染管道停滞；仅 fullPage 截图出现 sticky 侧栏重复的拼接工件（截图工具行为，改用大视口单帧规避）
 
+## 复检（第二轮，2026-08-31 提交后）
+
+对已提交状态独立复验。**发现并修复 1 处，其余全部通过**：
+
+- [x] **提交隔离**：`91fddfb`（feat，27 代码文件 + 592 woff2 + OFL + lockfile/gitignore）、`5cbcde6`（M1' 遗留补记，2 文件）、`87ab666`（M2' 文档 15 文件）；三提交 `notes/` 零卷入；`4cfda21..HEAD` 对 server/、markdown.ts、tts.ts、search.ts、backlinks.ts、theme.ts、index.html **零改动**；交接提示词两文件保持未跟踪。
+- [x] **负向清单逐条**：组件内散写 hex/rgba 归零；`prefers-color-scheme` 仅 theme.ts matchMedia 字符串；媒体查询全部 `767px` 字面量；z-index 全部令牌；localStorage 全部 `en_tool:` 前缀；依赖增量仅 `cn-font-split@7.4.3`（devDep，lockfile 同步）。EditView:549 的 ui-monospace 散写栈为 v1 既有（M1' 复检确认无回归），非本轮引入，暂不并入 `--font-mono`（观察项）。
+- [x] **构建复现**：HEAD 重新 `npm run build`，产物 hash（index-DFCE8irX.css / index-YLbPhzWz.js）与实施验证逐字节一致。
+- [x] **fonts.css 对账**：592 条 @font-face（400:291 / 700:301）全部 `font-display:swap`、绝对路径 `/fonts/serif/...`、family 精确 `Noto Serif SC Web`、无相对路径残留；引用集与磁盘 woff2 逐文件一致（400/700 两档 comm 差集为空）。
+- [x] **tokens.css 回归核对**：M1' 三件套（body 字体接线 / html 画布底 / 表单控件 inherit）完好；深色层 8 组标签变体齐全。
+- [x] **浏览器独立实测**：浅色 12/12、深色 8/8（零横滚、零错误、data-theme/color-scheme 正确）；衬线边界（正文衬线 17px、标题 Inter、IPA Noto Sans）；标签 hover 叠加真实指针复测通过；preview 生产构建 16 片正常加载。
+- [x] **发现并修复：字体产物遗留 `index.proto`**（cn-font-split 的 protobuf 内部元数据，400/700 目录各 1 个，非字体资产却随 feat 入库/部署）→ 已删除并泛化 build-fonts.mjs 清理逻辑（产物目录只保留 woff2），`8f3b9c2` 单独 fix 提交；woff2 集合未受影响。
+- [x] **残留清理**：两源 localStorage 仅 `en_tool:theme`（已恢复 system）、无编辑草稿残留；notes/ 与工作区干净。
+- [△] **复检方法论沉淀（非缺陷）**：`document.fonts.check(family, text)` 的样本文本必须取自**实际以衬线渲染的上下文**——同一字若只出现在行内代码/加粗等非衬线上下文，其衬线面不会被渲染触发，check 返回 false 属正常语义；用 `fonts.load()` 显式加载后 check 即 true，画布对比因 canvas 不触发字体加载会静默回退也不可作为证据。判定衬线渲染正确性的可靠依据是「渲染请求触发的 FontFace loaded 集合」+ 整页截图字形。
+
 ## 已知限制
 
 1. **build:fonts 重跑等价而非逐字节一致**：并行 worker 打包顺序导致少数分片内容哈希重排（无选项可控）；提交态产物为权威版本，重跑会生成等价但文件名不同的分片。/fonts.css 与磁盘分片一一对应。
