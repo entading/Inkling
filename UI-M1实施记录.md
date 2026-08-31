@@ -20,6 +20,7 @@
    - wiki 下划线 ×2：`MarkdownViewer.vue:345/355` → `var(--wiki-underline)` / `var(--wiki-underline-missing)`
    - `background: #fff` ×2：`Settings.vue:280`（开关 thumb）、`:327`（二维码容器）→ `var(--color-surface)`
    - `color: #fff` → `var(--color-on-accent)`，实际 10 处（文档写 8，grep 实测 10）：`App.vue:87`、`TagBadge.vue:29`、`Tags.vue:106`、`Home.vue:120`、`NewNote.vue:277`、`NoteView.vue:571/577`、`NotFound.vue:47`、`EditView.vue:411`、`Settings.vue:427`
+   - 收敛总计 **19 处**：4 focus + 2 wiki + 1 url-link（清单外）+ 2 `background:#fff` + 10 `color:#fff`；其中 18 处数值完全相同，仅 focus ring 为 0.12→0.16 有意微差（见偏离 #2）
 8. **`UI优化设计方案.md`**：§12 表 M1' 行追加完成标注与提交哈希。
 9. **`AGENTS.md`**：「UI 焕新阶段补充约定」回写 M1' 沉淀的新约束（防闪脚本与 theme.ts 双点同步、表单控件 inherit、清单外收敛项等）。
 10. **验证**：`npm run build` → browser-use 全页面走查矩阵（12 页面 × 深浅两主题）→ 375px 移动端抽查 → 主题三态/刷新记忆/防闪（preview 生产构建）→ computed 字体验证 → 截图 ≥6 张落 `UI-M1截图/`。
@@ -91,6 +92,18 @@
 - [x] 首页：底部导航、safe-area、板块卡单列折行正常（浅色=跟随系统时的正确解析结果）
 - [x] 阅读页：横滚代码块、缺失链接 banner、标签折行正常
 - [x] 设置页：外观分段控件不溢出，深浅两主题各验一轮
+
+## 复检（第二轮，2026-08-31 提交后）
+
+对已提交状态（HEAD = 55d929e）独立复验，全部通过、零缺陷：
+
+- [x] **提交隔离**：`efccdeb` 18 文件（仅 web/ 与 lockfile）、`55d929e` 15 文件（AGENTS/设计方案/实施记录/12 截图）；两提交均未触碰 `notes/`；`UI-M1交接提示词.md` 保持未跟踪未提交。
+- [x] **负向清单逐条**：组件内硬编码色 grep 归零（rgba(59/96/…)、#fff、6 位 hex 全无）；`prefers-color-scheme` 仅存在于 theme.ts 的 matchMedia 字符串与 tokens.css 守卫；server/、markdown.ts、tts.ts、search.ts、backlinks.ts 零改动；依赖增量仅 `@vueuse/core ^14.4.0`；theme.ts 无任何 api./fetch 调用（纯前端）；未新增媒体查询断点与 z-index。
+- [x] **构建可复现**：HEAD 重新 `npm run build`，产物 hash（index-CVNL-oA4.css / index-D9oFnQrr.js）与验证时逐字节一致——提交态即验证态。
+- [x] **字体链路三件套**：body=Inter 栈、button=Inter 栈（分叉消除）、编辑区 `.source-input` 仍为 ui-monospace 栈——tokens.css 元素级 `textarea { font-family: inherit }` 的特异性低于组件类选择器，v1 既有等宽编辑字体**无回归**（此前未显式验证过此项，复检补上）。
+- [x] **过渡类生命周期**：点击切换瞬间 `html.theme-transitioning` 存在，约 450ms 后已移除，常态无残留类。
+- [x] **深色交互态补充**：TagBadge hover 实测 `background: rgb(96,165,250)`（accent-400）+ `color: rgb(11,18,32)`（--color-on-accent 深字），令牌收敛在 hover 交互下同样正确。
+- [x] **测试残留清理**：临时词条的 localStorage 编辑草稿（`en_tool:draft:vocab:m1-dark-check`，M4 草稿功能所存，实施时未察觉）已在复检中清除；IAB 内 5173/4173 两源的主题偏好已恢复 system/清空，localStorage 零测试残留。
 
 ## 已知限制
 
