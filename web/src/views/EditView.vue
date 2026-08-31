@@ -408,7 +408,7 @@ watch(() => route.params, load)
   border: none;
   border-radius: var(--radius-md);
   background: var(--color-accent);
-  color: #fff;
+  color: var(--color-on-accent);
   cursor: pointer;
   transition: opacity 0.15s ease;
 }
@@ -560,7 +560,7 @@ watch(() => route.params, load)
 .source-input:focus {
   outline: none;
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+  box-shadow: var(--focus-ring);
 }
 
 .pane-preview {

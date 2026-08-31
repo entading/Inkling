@@ -342,7 +342,7 @@ watch(() => props.body, hidePreview)
 .note-body :deep(a) {
   color: var(--color-accent);
   text-decoration: none;
-  border-bottom: 1px solid rgba(59, 130, 246, 0.3);
+  border-bottom: 1px solid var(--wiki-underline);
 }
 
 .note-body :deep(a:hover) {
@@ -352,7 +352,7 @@ watch(() => props.body, hidePreview)
 /* 双向链接（M5）：无 href，跳转由根节点事件委托处理 */
 .note-body :deep(a.wiki-link) {
   color: var(--color-accent);
-  border-bottom: 1px dashed rgba(59, 130, 246, 0.5);
+  border-bottom: 1px dashed var(--wiki-underline-missing);
   cursor: pointer;
 }
 

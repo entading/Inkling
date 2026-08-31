@@ -44,7 +44,7 @@ import { RouterLink } from 'vue-router'
   padding: var(--space-2) var(--space-5);
   border-radius: var(--radius-md);
   background: var(--color-accent);
-  color: #fff;
+  color: var(--color-on-accent);
   text-decoration: none;
   transition: opacity 0.15s ease;
 }

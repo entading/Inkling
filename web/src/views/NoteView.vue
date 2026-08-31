@@ -568,13 +568,13 @@ async function refreshMissingLinks(): Promise<void> {
 }
 
 .delete-btn.confirm {
-  color: #fff;
+  color: var(--color-on-accent);
   background: var(--color-danger);
   border-color: var(--color-danger);
 }
 
 .delete-btn.confirm:hover {
-  color: #fff;
+  color: var(--color-on-accent);
   opacity: 0.9;
 }
 

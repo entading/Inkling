@@ -103,7 +103,7 @@ function fontSize(count: number): string {
 
 .cloud-tag:hover {
   background: var(--color-accent);
-  color: #fff;
+  color: var(--color-on-accent);
 }
 
 .cloud-count {
