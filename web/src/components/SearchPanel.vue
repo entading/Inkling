@@ -264,7 +264,7 @@ onBeforeUnmount(() => {
 .search-input:focus {
   outline: none;
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+  box-shadow: var(--focus-ring);
 }
 
 .chip {

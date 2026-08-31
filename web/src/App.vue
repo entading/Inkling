@@ -84,7 +84,7 @@ import { boardRoutes } from './router'
   height: 28px;
   border-radius: var(--radius-md);
   background: var(--color-accent);
-  color: #fff;
+  color: var(--color-on-accent);
   font-weight: 700;
   display: grid;
   place-items: center;

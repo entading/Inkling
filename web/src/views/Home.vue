@@ -117,7 +117,7 @@ onBeforeUnmount(() => {
   font-size: 0.9rem;
   border-radius: var(--radius-md);
   background: var(--color-accent);
-  color: #fff;
+  color: var(--color-on-accent);
   text-decoration: none;
   white-space: nowrap;
   transition: opacity 0.15s ease;

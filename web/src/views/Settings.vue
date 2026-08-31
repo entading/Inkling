@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { api, type ServerInfo } from '../api'
+import { useTheme, type ThemePreference } from '../lib/theme'
 import {
   clearSavedVoice,
   getSavedVoiceName,
@@ -9,6 +10,36 @@ import {
   saveVoiceName,
   speak,
 } from '../lib/tts'
+
+// ---------- 外观（主题）：纯前端偏好，存 localStorage en_tool:theme，不走 /api/settings ----------
+
+const theme = useTheme()
+
+const themeOptions: ReadonlyArray<{ value: ThemePreference; label: string }> = [
+  { value: 'system', label: '跟随系统' },
+  { value: 'light', label: '浅色' },
+  { value: 'dark', label: '深色' },
+]
+
+const themeGroup = ref<HTMLElement | null>(null)
+
+/** radiogroup 键盘模式：方向键循环移动并选中（roving tabindex，焦点跟随选中项） */
+function onThemeKeydown(e: KeyboardEvent): void {
+  const idx = themeOptions.findIndex((o) => o.value === theme.preference.value)
+  if (idx < 0) return
+  let delta = 0
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') delta = 1
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') delta = -1
+  else return
+  e.preventDefault()
+  const next = themeOptions[(idx + delta + themeOptions.length) % themeOptions.length]
+  theme.setPreference(next.value)
+  requestAnimationFrame(() => {
+    themeGroup.value
+      ?.querySelectorAll<HTMLButtonElement>('[role="radio"]')
+      [themeOptions.indexOf(next)]?.focus()
+  })
+}
 
 const info = ref<ServerInfo | null>(null)
 const loading = ref(true)
@@ -112,6 +143,35 @@ onMounted(load)
     <header class="page-header">
       <h1 class="page-title">设置</h1>
     </header>
+
+    <!-- 外观为纯前端能力，不依赖服务端：error / 加载中时同样可用 -->
+    <section class="card">
+      <h2 class="card-title">外观</h2>
+      <p class="desc">
+        界面配色主题。「跟随系统」时自动与操作系统的深浅色设置保持一致，偏好保存在当前浏览器。
+      </p>
+      <div
+        ref="themeGroup"
+        class="theme-seg"
+        role="radiogroup"
+        aria-label="界面主题"
+        @keydown="onThemeKeydown"
+      >
+        <button
+          v-for="opt in themeOptions"
+          :key="opt.value"
+          type="button"
+          role="radio"
+          class="theme-opt"
+          :class="{ active: theme.preference.value === opt.value }"
+          :aria-checked="theme.preference.value === opt.value"
+          :tabindex="theme.preference.value === opt.value ? 0 : -1"
+          @click="theme.setPreference(opt.value)"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
+    </section>
 
     <p v-if="error" class="error">加载失败：{{ error }}</p>
     <p v-else-if="loading" class="hint">加载中…</p>
@@ -234,6 +294,42 @@ onMounted(load)
   font-weight: 600;
 }
 
+.theme-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.theme-opt {
+  padding: var(--space-1) var(--space-4);
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.theme-opt:hover {
+  color: var(--color-text);
+}
+
+.theme-opt.active {
+  color: var(--color-text);
+  font-weight: 500;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.theme-opt:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
 .desc {
   margin: 0 0 var(--space-3);
   color: var(--color-text-secondary);
@@ -277,7 +373,7 @@ onMounted(load)
   width: 18px;
   height: 18px;
   border-radius: var(--radius-full);
-  background: #fff;
+  background: var(--color-surface);
   box-shadow: var(--shadow-sm);
   transition: transform 0.2s ease;
 }
@@ -312,7 +408,7 @@ onMounted(load)
   font-size: 0.95rem;
   color: var(--color-accent);
   text-decoration: none;
-  border-bottom: 1px solid rgba(59, 130, 246, 0.3);
+  border-bottom: 1px solid var(--wiki-underline);
   overflow-wrap: anywhere;
 }
 
@@ -324,7 +420,7 @@ onMounted(load)
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: var(--space-2);
-  background: #fff;
+  background: var(--color-surface);
 }
 
 .path {
@@ -424,7 +520,7 @@ onMounted(load)
 }
 
 .tts-preview:hover:not(:disabled) {
-  color: #fff;
+  color: var(--color-on-accent);
   background: var(--color-accent);
 }
 

@@ -3,6 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // 防白闪：挂载前同步解析主题偏好设 data-theme；localStorage 不可用（隐私模式等）静默回退
+      ;(function () {
+        var pref = null
+        try {
+          pref = localStorage.getItem('en_tool:theme')
+        } catch (e) {
+          /* 隐私模式等：走系统偏好 */
+        }
+        if (pref !== 'light' && pref !== 'dark') {
+          pref =
+            window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light'
+        }
+        document.documentElement.dataset.theme = pref
+      })()
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Inkling</title>
   </head>

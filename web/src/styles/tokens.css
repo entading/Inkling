@@ -1,14 +1,36 @@
-/* 设计令牌：浅色极简 —— 白底、留白、单一强调色 */
+/* 设计令牌：浅色极简 —— 白底、留白、单一强调色；深色唯一来源是 [data-theme='dark'] 令牌覆盖 */
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
 
+/* P0 全局字体接线：--font-sans 此前定义但从未被应用，正文一直渲染浏览器默认字体 */
+body {
+  font-family: var(--font-sans);
+}
+
+/* 画布随主题：页面背景涂在 Vue 渲染的 .app 上，挂载前 html 画布需自行着色，
+   深色刷新时才不会先闪一帧白（浅色 #fafafa 与 .app 同值，零观感变化） */
+html {
+  background: var(--color-bg);
+}
+
+/* 表单控件不走标准字体继承（实测 button 渲染 Arial），显式继承保持与正文一致 */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
 :root {
+  color-scheme: light;
+
   /* 颜色 */
   --color-bg: #fafafa;
   --color-surface: #ffffff;
+  --color-surface-2: #f3f4f6;            /* 次级表面：hover 底、代码块底、骨架屏底 */
   --color-text: #1f2937;
   --color-text-secondary: #6b7280;
   --color-accent: #3b82f6;
@@ -16,6 +38,35 @@
   --color-border: #e5e7eb;
   --color-danger: #ef4444;
   --color-danger-soft: #fef2f2;
+  --color-on-accent: #ffffff;            /* 强调色实底上的文字 */
+  --focus-ring: 0 0 0 3px rgba(59, 130, 246, 0.16);  /* 输入框焦点光圈 */
+  --wiki-underline: rgba(59, 130, 246, 0.3);
+  --wiki-underline-missing: rgba(59, 130, 246, 0.5);
+
+  /* 动效（M3' 起在组件中使用） */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* 字号阶梯（M2' 起替换各组件散写 rem 值） */
+  --text-xs: 0.78rem;
+  --text-sm: 0.88rem;
+  --text-base: 0.95rem;
+  --text-md: 1rem;
+  --text-lg: 1.1rem;
+  --text-xl: 1.4rem;
+  --text-2xl: 1.7rem;
+
+  /* 板块个性色（主色 + 柔和底；M2' 起在组件中使用） */
+  --board-vocab: #3b82f6;
+  --board-vocab-soft: #eff6ff;
+  --board-phrase: #0d9488;
+  --board-phrase-soft: #f0fdfa;
+  --board-sentence: #d97706;
+  --board-sentence-soft: #fffbeb;
+  --board-grammar: #16a34a;
+  --board-grammar-soft: #f0fdf4;
 
   /* 圆角 */
   --radius-sm: 6px;
@@ -57,6 +108,57 @@
   --z-drop: 30;
   --z-nav: 40;
   --z-float: 50;
+}
+
+/* 深色主题：全靠令牌覆盖，组件内禁止 prefers-color-scheme 分支与散写 hex/rgba */
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-bg: #101418;
+  --color-surface: #171d24;
+  --color-surface-2: #1f2730;
+  --color-text: #e5e7eb;
+  --color-text-secondary: #9ca3af;
+  --color-accent: #60a5fa;
+  --color-accent-soft: rgba(96, 165, 250, 0.14);
+  --color-border: #2a323c;
+  --color-danger: #f87171;
+  --color-danger-soft: rgba(248, 113, 113, 0.12);
+  /* 亮蓝实底（--color-accent 提亮后）上改用深字保证对比 */
+  --color-on-accent: #0b1220;
+
+  --focus-ring: 0 0 0 3px rgba(96, 165, 250, 0.22);
+  /* 深底下除随 accent 提亮外再抬一档透明度，保证实/虚下划线可辨 */
+  --wiki-underline: rgba(96, 165, 250, 0.42);
+  --wiki-underline-missing: rgba(96, 165, 250, 0.62);
+
+  /* 深色阴影弱化为更深色（分层主要靠表面亮度阶梯 + 边框） */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+
+  /* 板块个性色深色变体：主色提亮一档（400 档）、soft 改低透明度 rgba */
+  --board-vocab: #60a5fa;
+  --board-vocab-soft: rgba(96, 165, 250, 0.14);
+  --board-phrase: #2dd4bf;
+  --board-phrase-soft: rgba(45, 212, 191, 0.12);
+  --board-sentence: #fbbf24;
+  --board-sentence-soft: rgba(251, 191, 36, 0.12);
+  --board-grammar: #4ade80;
+  --board-grammar-soft: rgba(74, 222, 128, 0.12);
+}
+
+/* 主题切换瞬间的全局平滑过渡：仅 .theme-transitioning 存续期间生效（由 theme.ts
+   在切换前挂上、约 240ms 后移除），reduced-motion 用户直接跳过，无常态 transition */
+@media (prefers-reduced-motion: no-preference) {
+  html.theme-transitioning,
+  html.theme-transitioning *,
+  html.theme-transitioning *::before,
+  html.theme-transitioning *::after {
+    transition:
+      background-color var(--duration-base) ease,
+      color var(--duration-base) ease,
+      border-color var(--duration-base) ease !important;
+  }
 }
 
 /* 全局键盘焦点样式（M7）：键盘 Tab 导航时才出现（focus-visible），鼠标点击不触发 */
