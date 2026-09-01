@@ -54,6 +54,7 @@ textarea {
   --duration-page: 160ms;                /* 页面转场（§6 定稿 160ms，不在交互阶梯内） */
   --stagger-step: 24ms;                  /* 列表入场 stagger 逐项 delay 步进 */
   --duration-shimmer: 1400ms;            /* 骨架屏高光扫描循环周期（循环动效非交互反馈） */
+  --duration-pulse: 600ms;               /* 色板选中脉冲：点击亮起后衰减熄灭（v1.1 迭代③，非交互反馈） */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   /* 骨架屏高光：中性灰底上的白色叠加扫光，双主题同构、仅透明度分层（浅 0.65 / 深 0.07） */
   --skeleton-shimmer: rgba(255, 255, 255, 0.65);
