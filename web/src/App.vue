@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
+import CommandPalette from './components/CommandPalette.vue'
 import Icon, { type IconName } from './components/Icon.vue'
 import { boardRoutes } from './router'
 
@@ -15,6 +17,24 @@ const NAV_ICONS: Record<string, IconName> = {
   '/tags': 'tag',
   '/settings': 'settings',
 }
+
+// ---------- 命令面板（§7）：全局 Ctrl/Cmd+K 触发 + 侧栏入口 ----------
+
+const paletteOpen = ref(false)
+
+/** kbd 文案按平台：Apple 系 ⌘K，其余 Ctrl K（UA 检测，仅用于展示，监听两侧都收） */
+const isApplePlatform = /mac|iphone|ipad|ipod/i.test(navigator.userAgent)
+const kbdHint = isApplePlatform ? '⌘K' : 'Ctrl K'
+
+function onGlobalKeydown(e: KeyboardEvent): void {
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
+    e.preventDefault()
+    paletteOpen.value = !paletteOpen.value
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', onGlobalKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
 </script>
 
 <template>
@@ -24,6 +44,13 @@ const NAV_ICONS: Record<string, IconName> = {
         <span class="brand-mark">I</span>
         <span class="brand-name">Inkling</span>
       </RouterLink>
+
+      <!-- 命令面板入口（§7）：nav-item 同款视觉，kbd 提示快捷键 -->
+      <button type="button" class="search-entry" @click="paletteOpen = true">
+        <Icon name="search" :size="16" />
+        <span>搜索</span>
+        <kbd class="kbd-hint">{{ kbdHint }}</kbd>
+      </button>
 
       <nav class="nav">
         <RouterLink to="/" class="nav-item" exact-active-class="active">
@@ -62,6 +89,9 @@ const NAV_ICONS: Record<string, IconName> = {
         </Transition>
       </RouterView>
     </main>
+
+    <!-- 命令面板（§7）：Teleport body，全键盘可用 -->
+    <CommandPalette :open="paletteOpen" @close="paletteOpen = false" />
 
     <!-- 移动端底部导航：替代桌面侧边栏（设计 3.3），标签/设置收进首页右上角菜单 -->
     <nav class="bottom-nav" aria-label="移动端主导航">
@@ -130,6 +160,43 @@ const NAV_ICONS: Record<string, IconName> = {
   letter-spacing: 0.01em;
 }
 
+/* 命令面板入口（§7）：nav-item 同款视觉；kbd 靠右提示快捷键 */
+.search-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: calc(100% - var(--space-4) * 2);
+  margin: var(--space-3) var(--space-4) 0;
+  padding: var(--space-2) var(--space-3);
+  font-family: inherit;
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.search-entry:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.kbd-hint {
+  margin-left: auto;
+  padding: 0 var(--space-1);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
 .nav {
   margin-top: var(--space-6);
   display: flex;
@@ -191,6 +258,10 @@ const NAV_ICONS: Record<string, IconName> = {
   .page-leave-to {
     opacity: 0;
     transform: translateY(-4px);
+  }
+
+  .search-entry:active {
+    transform: scale(0.98);
   }
 }
 
