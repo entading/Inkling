@@ -47,7 +47,12 @@ textarea {
   --duration-fast: 120ms;
   --duration-base: 200ms;
   --duration-slow: 320ms;
+  --duration-page: 160ms;                /* 页面转场（§6 定稿 160ms，不在交互阶梯内） */
+  --stagger-step: 24ms;                  /* 列表入场 stagger 逐项 delay 步进 */
+  --duration-shimmer: 1400ms;            /* 骨架屏高光扫描循环周期（循环动效非交互反馈） */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  /* 骨架屏高光：中性灰底上的白色叠加扫光，双主题同构、仅透明度分层（浅 0.65 / 深 0.07） */
+  --skeleton-shimmer: rgba(255, 255, 255, 0.65);
 
   /* 字号阶梯（M2' 起替换各组件散写 rem 值） */
   --text-xs: 0.78rem;
@@ -155,6 +160,9 @@ textarea {
   /* 深底下除随 accent 提亮外再抬一档透明度，保证实/虚下划线可辨 */
   --wiki-underline: rgba(96, 165, 250, 0.42);
   --wiki-underline-missing: rgba(96, 165, 250, 0.62);
+
+  /* 深色骨架高光：暗底上压暗会失去对比，改为极淡白色提亮扫描 */
+  --skeleton-shimmer: rgba(255, 255, 255, 0.07);
 
   /* 深色阴影弱化为更深色（分层主要靠表面亮度阶梯 + 边框） */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);

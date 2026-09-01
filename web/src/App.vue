@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
+import { RouterLink, RouterView, useRoute } from 'vue-router'
 import Icon, { type IconName } from './components/Icon.vue'
 import { boardRoutes } from './router'
+
+const route = useRoute()
 
 /** 导航图标（§4）：侧栏与底部导航共用一份映射，颜色随 RouterLink 的 currentColor 变化 */
 const NAV_ICONS: Record<string, IconName> = {
@@ -52,7 +54,13 @@ const NAV_ICONS: Record<string, IconName> = {
     </aside>
 
     <main class="content">
-      <RouterView />
+      <!-- 页面转场（§6）：out-in 顺序播放入场 fade；key=route.path——query 变化
+           （板块页搜索）不触发转场属预期，路由间才转场 -->
+      <RouterView v-slot="{ Component }">
+        <Transition name="page" mode="out-in">
+          <component :is="Component" :key="route.path" />
+        </Transition>
+      </RouterView>
     </main>
 
     <!-- 移动端底部导航：替代桌面侧边栏（设计 3.3），标签/设置收进首页右上角菜单 -->
@@ -138,7 +146,8 @@ const NAV_ICONS: Record<string, IconName> = {
   color: var(--color-text-secondary);
   text-decoration: none;
   font-size: var(--text-base);
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
 }
 
 .nav-item:hover {
@@ -163,6 +172,26 @@ const NAV_ICONS: Record<string, IconName> = {
   flex: 1;
   min-width: 0;
   padding: var(--space-6) var(--space-7);
+}
+
+/* 页面转场（§6 决策 #3）：入场 fade + 4px 上移，各 160ms；
+   与全部新增动画一致包在 no-preference 内（reduced-motion 直切无过渡） */
+@media (prefers-reduced-motion: no-preference) {
+  .page-enter-active,
+  .page-leave-active {
+    transition: opacity var(--duration-page) var(--ease-out),
+      transform var(--duration-page) var(--ease-out);
+  }
+
+  .page-enter-from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  .page-leave-to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 
 .bottom-nav {
@@ -201,7 +230,7 @@ const NAV_ICONS: Record<string, IconName> = {
     font-size: var(--text-xs);
     color: var(--color-text-secondary);
     text-decoration: none;
-    transition: color 0.15s ease;
+    transition: color var(--duration-fast) var(--ease-out);
   }
 
   .bottom-item.active {

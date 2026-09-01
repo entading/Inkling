@@ -3,6 +3,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import TagBadge from '../components/TagBadge.vue'
 import MarkdownViewer from '../components/MarkdownViewer.vue'
+import Skeleton from '../components/Skeleton.vue'
 import { api, type Board, type NoteDetailRaw } from '../api'
 import { getBacklinks, stripCodeText, type Backlink } from '../lib/backlinks'
 import { isLegalWikiText, parseWikiTarget, setLinkIndex, WIKI_LINK_RE } from '../lib/markdown'
@@ -273,7 +274,16 @@ async function refreshMissingLinks(): Promise<void> {
       <strong>词条不存在或加载失败</strong>
       <span>{{ error }}</span>
     </p>
-    <p v-else-if="loading" class="hint">加载中…</p>
+    <div v-else-if="loading" class="note-skeleton" aria-hidden="true">
+      <Skeleton class="sk-title" />
+      <Skeleton class="sk-ipa" />
+      <div class="sk-paras">
+        <div v-for="p in 3" :key="p" class="sk-para">
+          <Skeleton class="sk-line" />
+          <Skeleton class="sk-line sk-line-last" />
+        </div>
+      </div>
+    </div>
 
     <article v-else-if="note" class="note">
       <header class="note-header">
@@ -389,6 +399,67 @@ async function refreshMissingLinks(): Promise<void> {
   color: var(--color-text-secondary);
 }
 
+/* 加载骨架（§6）：容器复用 .note 卡片规格（surface/border/radius-lg/padding/阴影），
+   标题/IPA/正文条高度走 --text-*，段距对齐正文 0.9em，减少加载完成时的布局跳动 */
+.note-skeleton {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-7);
+  box-shadow: var(--shadow-sm);
+}
+
+.sk-title {
+  height: var(--text-2xl);
+  width: 45%;
+}
+
+.sk-ipa {
+  height: var(--text-lg);
+  width: 28%;
+  margin-top: var(--space-3);
+}
+
+.sk-paras {
+  margin-top: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: 0.9em;
+}
+
+.sk-para {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8em;
+}
+
+.sk-line {
+  height: var(--text-body);
+}
+
+.sk-para:nth-child(1) .sk-line-last {
+  width: 88%;
+}
+
+.sk-para:nth-child(2) .sk-line-last {
+  width: 72%;
+}
+
+.sk-para:nth-child(3) .sk-line-last {
+  width: 55%;
+}
+
+/* 按压反馈（§6）：全部新增动画统一包在 no-preference 内 */
+@media (prefers-reduced-motion: no-preference) {
+  .speak-btn:active,
+  .edit-link:active,
+  .delete-btn:active,
+  .sel-bar-btn:active,
+  .banner-close:active {
+    transform: scale(0.98);
+  }
+}
+
 .error {
   display: flex;
   flex-direction: column;
@@ -447,7 +518,10 @@ async function refreshMissingLinks(): Promise<void> {
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+  transition: color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .speak-btn:hover {
@@ -475,6 +549,7 @@ async function refreshMissingLinks(): Promise<void> {
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-out);
 }
 
 .sel-bar-btn:hover {
@@ -540,7 +615,9 @@ async function refreshMissingLinks(): Promise<void> {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   text-decoration: none;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .edit-link:hover {
@@ -559,7 +636,10 @@ async function refreshMissingLinks(): Promise<void> {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+  transition: color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .delete-btn:hover {
@@ -620,6 +700,7 @@ async function refreshMissingLinks(): Promise<void> {
   font-size: var(--text-md);
   line-height: 1;
   cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-out);
 }
 
 .banner-close:hover {
@@ -680,6 +761,10 @@ async function refreshMissingLinks(): Promise<void> {
 
 @media (max-width: 767px) {
   .note {
+    padding: 20px;
+  }
+
+  .note-skeleton {
     padding: 20px;
   }
 

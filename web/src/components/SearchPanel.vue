@@ -254,7 +254,8 @@ onBeforeUnmount(() => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .search-input::placeholder {
@@ -280,7 +281,10 @@ onBeforeUnmount(() => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  transition: color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .chip:hover {
@@ -292,6 +296,13 @@ onBeforeUnmount(() => {
   color: var(--color-accent);
   background: var(--color-accent-soft);
   border-color: var(--color-accent);
+}
+
+/* 按压反馈（§6）：chip 以 translateY(-50%) 垂直居中，:active 需组合保留否则按住时跳位 */
+@media (prefers-reduced-motion: no-preference) {
+  .chip:active {
+    transform: translateY(-50%) scale(0.98);
+  }
 }
 
 .search-error {

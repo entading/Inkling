@@ -46,7 +46,7 @@ import { RouterLink } from 'vue-router'
   background: var(--color-accent);
   color: var(--color-on-accent);
   text-decoration: none;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--duration-fast) var(--ease-out);
 }
 
 .home-link:hover {

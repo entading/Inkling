@@ -104,7 +104,8 @@ function fontSize(count: number): string {
   border-radius: var(--radius-full);
   line-height: 1.8;
   text-decoration: none;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
 }
 
 /* hover 与 TagBadge 同策略：叠加 --tag-hover-overlay 强化，不动文字色 */

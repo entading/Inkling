@@ -100,7 +100,8 @@ function scrollTo(key: string) {
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: background-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .az-letter:hover:not(.disabled) {
@@ -110,6 +111,13 @@ function scrollTo(key: string) {
 .az-letter.disabled {
   color: var(--color-border);
   cursor: default;
+}
+
+/* 按压反馈（§6）：全部新增动画统一包在 no-preference 内 */
+@media (prefers-reduced-motion: no-preference) {
+  .az-letter:active {
+    transform: scale(0.98);
+  }
 }
 
 .az-groups {

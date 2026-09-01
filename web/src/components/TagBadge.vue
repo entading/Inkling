@@ -24,7 +24,8 @@ const pairClass = computed(() => `tag-pair-${tagPairIndex(props.tag)}`)
   line-height: 1.5;
   white-space: nowrap;
   text-decoration: none;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
 }
 
 /* hover 统一强化：叠加 --tag-hover-overlay 极淡覆盖（浅色压暗/深色提亮），不动文字色 */
