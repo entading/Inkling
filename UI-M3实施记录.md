@@ -146,6 +146,22 @@
 - [x] 定性实验链：rAF 探针（0 帧/1.5s）→ 50ms setTimeout 实测 554ms → `visibilityState=visible/hasFocus=false` → 判定「遮挡窗口节流」；rAF→setTimeout 垫片驱动 Vue 转场编排完整走通 → **应用逻辑无缺陷**；垫片安装晚于 Vue 首次 rAF 调用时编排仍冻结（原生 rAF 回调已丢失）→ 引入终态踢手法补验证
 - [x] 已回写 AGENTS.md「浏览器验证工具」节供后续里程碑使用
 
+## 复检（第二轮，2026-09-01 提交后）
+
+对已提交状态（HEAD = e7fcc12）独立复验四个功能模块，**发现并修复 1 处自留死代码，其余全部通过**：
+
+- [x] **提交隔离与禁区**：`36da2da` 17 文件（15 改 + Skeleton.vue/stagger.ts 新建）全部在 web/src 内；`2abe757..HEAD` 对 server/、notes/、markdown.ts、tts.ts、theme.ts、index.html、fonts.css、build-fonts 脚本、两级 package.json **零改动**；三笔提交 notes/ 零卷入；三份交接提示词保持未跟踪未提交。
+- [x] **负向清单逐条（grep 实证）**：依赖零增量；组件内 0.15s/0.2s 等 s 字面值归零；`prefers-reduced-motion: reduce` 覆盖分支全站零处；测试残留（M3'-TEST-SLEEP/__m3seen/__m3arm/__rafPatched）归零；notes/ 无临时词条（m3-stagger-* 建删闭环，API 计数复核 19→6）。
+- [x] **构建复现**：HEAD 重新 `npm run build`，产物 hash（index-CFIIn9rp.css / index-CDqo7dCE.js）与实施验证逐字节一致——提交态即验证态。
+- [x] **模块 A 页面转场（代码+实测）**：CSSOM 确认 `.page-enter-active/.page-leave-active` 用 `var(--duration-page) var(--ease-out)`、enter-from/leave-to 各 ±4px 位移、全部位于 no-preference 块；垫片驱动的类演化采样完整走通 out-in 全时序（leave-from→leave-to→卸载/挂载 swap→enter-from→enter-to→类全清），终态 `board-page` 单根、零残留；query 变化不触发转场（key=route.path 语义）复核无误。
+- [x] **模块 B 骨架屏（重新注入实测后移除）**：Board 6 行（行容器复用 .note-row 规格：surface 底/12px 16px padding/10px 圆角，内容条 16px=--text-md，搜索框常驻不进骨架）；NoteView 8 条（标题 27.2px=--text-2xl，卡片 48px padding/14px 圆角=.note 规格）；Home 4 卡（chip 40px、auto-fit 网格与真实板块卡同列数）+6 行；三处 shimmer 均为 `skeleton-sweep` 1.4s；深色骨架条 #1f2730（--color-surface-2 深色变体）可读。复检注入（1500ms×3）验证后全部移除，grep 归零。
+- [x] **模块 C stagger/按压/令牌化**：结构断言（19 行状态下，7 实例 sizes 1+1+13+1+1+1+1）每实例前 12 项 row-in + 内联 `calc(var(--stagger-step) * i)`，M 组 computed delay 0→264ms 严格 24ms 递增，第 13 项无类无内联，errs=[]；arm 窗口时序（+400ms 武装 animationName=row-in-*、+2s 摘除 none）正确；窗口过期后过滤→还原零重播（19 行 0 动画态）；新导航重播正常（6 实例×index0=6 行动画态）；按压 CSSOM 10 组 `:active` 规则全部守卫内（含定位 chip 组合 transform）；存量映射后 s 字面值全站归零。
+- [x] **模块 D reduced-motion**：双源（dev + preview 生产构建）CSSOM 递归扫描，凡含 animation 的规则、row-in/skeleton-sweep keyframes、`:active`+transform 规则全部位于 no-preference 块内、**violations=[]**；theme-transitioning 既有守卫未破坏。
+- [x] **preview 复核**：4173 生产构建 CSSOM/结构/窗口时序/终态与 dev 一致；复核后进程精确 taskkill //PID //F 关停（无 //T），端口释放；两源 localStorage 仅 5173 存 `en_tool:theme=system`（默认态）、4173 零残留。
+- [x] **文档准确性**：记录中产物哈希、10 组按压规则、17 文件 feat 等数字与实测一一对应；§12 标注与 AGENTS「动效实现铁律」「浏览器验证工具（遮挡节流）」回写内容复核无误。
+- [x] **发现并修复：NoteView `.hint` 死选择器**（M3' 将加载提示替换为骨架时自留——`.hint, .error` 合并选择器中 `.hint` 已无模板引用；Home 同场景已清理，本处遗漏）→ 移除该选择器，`e9cc588` 单独 fix 提交；修复后 `npm run build` 通过（新产物 index-TmimObfk.css / index-DtATiXad.js）。
+- [备注] Board/Tags/TagDetail/Settings/EditView 的 `class="hint"`「加载中…」为 M3' 范围外既有实现（任务明确 EditView 等不在范围），其选择器属正常存活，非死代码；NoteView computed opacity 在遮挡节流下读 0 属已知 IAB computed 残影 quirk（同 [[已知 IAB quirk]]），以类生命周期为断言依据。
+
 ## 已知限制
 
 1. **动效逐帧/录屏证据缺失（IAB 遮挡节流）**：rAF 停发 + 定时器 10 倍节流使中间帧不可观测、录屏只有静止帧；转场/stagger 的过程正确性以「垫片驱动编排走通 + CSSOM 规则 + 类生命周期断言」承载，真实浏览器中的 160ms 淡入与 24ms 波浪未逐帧目验（机制为标准 Vue Transition/CSS animation，参数全部来自定稿令牌）。
