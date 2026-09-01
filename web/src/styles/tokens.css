@@ -39,6 +39,8 @@ textarea {
   --color-danger: #ef4444;
   --color-danger-soft: #fef2f2;
   --color-on-accent: #ffffff;            /* 强调色实底上的文字 */
+  /* 品牌标记渐变（UX 打磨）：高光蓝→accent 对角渐变，仅 .brand-mark 使用 */
+  --gradient-brand: linear-gradient(135deg, #60a5fa, #3b82f6);
   /* 浮层遮罩（M4' 命令面板）：半透明冷黑，双主题各自覆盖 */
   --overlay-bg: rgba(15, 23, 42, 0.4);
   --focus-ring: 0 0 0 3px rgba(59, 130, 246, 0.16);  /* 输入框焦点光圈 */
@@ -157,6 +159,8 @@ textarea {
   --color-danger-soft: rgba(248, 113, 113, 0.12);
   /* 亮蓝实底（--color-accent 提亮后）上改用深字保证对比 */
   --color-on-accent: #0b1220;
+  /* 品牌标记渐变深色变体：高光提到 300 档，暗底上保持醒目 */
+  --gradient-brand: linear-gradient(135deg, #93c5fd, #3b82f6);
   /* 深色遮罩：底已暗，加深透明度分层即可 */
   --overlay-bg: rgba(0, 0, 0, 0.55);
 
