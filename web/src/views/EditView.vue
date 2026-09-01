@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, RouterLink, useRoute } from 'vue-router'
+import Icon from '../components/Icon.vue'
 import MarkdownViewer from '../components/MarkdownViewer.vue'
-import { api, type Board, type NoteDetailRaw } from '../api'
+import { api, type Board, type NoteDetail, type NoteDetailRaw } from '../api'
 import { extractFrontmatter, stripFrontmatter } from '../lib/markdown'
-import { invalidateSearchIndex } from '../lib/search'
+import { getSearchIndex, invalidateSearchIndex } from '../lib/search'
 
 const route = useRoute()
 
@@ -139,6 +140,8 @@ watch(draft, (v) => {
 
 async function save() {
   if (saveState.value === 'saving') return
+  // 无改动零请求（M5'）：Ctrl+S 与保存按钮共用本函数，内容未变时不发 PUT
+  if (!dirty.value) return
   // frontmatter 被删除时二次确认（可取消后用提示条「恢复」一键还原）
   if (fmLost.value && !window.confirm('frontmatter（标题 / 标签 / 来源等元信息）已被删除，保存后阅读页标题将回退为文件名、标签与来源将丢失。确定保存吗？')) {
     return
@@ -168,6 +171,272 @@ function onKeyDown(e: KeyboardEvent) {
     e.preventDefault()
     void save()
   }
+}
+
+// ---------- 编辑器增强（M5'，§9）：工具条 / Tab 缩进 / [[ 补全 / 预览同步滚动 ----------
+// 红线：全部只「往 textarea 插文本」，PUT 全量源码语义与保存路径不变。
+
+const sourceInput = ref<HTMLTextAreaElement | null>(null)
+const previewPane = ref<HTMLElement | null>(null)
+
+/**
+ * 光标处插文本，优先 document.execCommand('insertText')——textarea 上各主流浏览器
+ * 仍支持，且原生触发 input 事件（v-model 同步）并保持单一撤销步。
+ * 失败/不可用降级 setRangeText（不发 input，需手动派发；会破坏撤销栈，仅兜底）。
+ */
+function insertTextAtSelection(el: HTMLTextAreaElement, text: string): void {
+  let ok = false
+  try {
+    ok = document.execCommand('insertText', false, text)
+  } catch {
+    ok = false
+  }
+  if (!ok) {
+    el.setRangeText(text, el.selectionStart, el.selectionEnd, 'end')
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+}
+
+/** 包裹类插入：有选区包裹选中文本，无选区插占位符并选中占位文本（便于直接改写） */
+function wrapSelection(prefix: string, suffix: string, placeholder: string): void {
+  const ta = sourceInput.value
+  if (!ta) return
+  ta.focus()
+  const start = ta.selectionStart
+  const end = ta.selectionEnd
+  const selected = ta.value.slice(start, end) || placeholder
+  ta.setSelectionRange(start, end)
+  insertTextAtSelection(ta, prefix + selected + suffix)
+  ta.setSelectionRange(start + prefix.length, start + prefix.length + selected.length)
+}
+
+/**
+ * 行首类插入：prefix 加到选区覆盖行的行首。引用（> ）作用于每一覆盖行；
+ * 标题（## ）单行语义，仅作用于选区首行。从最后一行向前插，前面的偏移不失效；
+ * 逐行 execCommand 各成一个撤销步（多行引用低频，接受）。
+ */
+function prefixLines(prefix: string, firstLineOnly = false): void {
+  const ta = sourceInput.value
+  if (!ta) return
+  ta.focus()
+  const value = ta.value
+  const start = ta.selectionStart
+  const end = ta.selectionEnd
+  const lineStart = value.lastIndexOf('\n', start - 1) + 1
+  // 收集选区覆盖行的行首偏移（引用=每一覆盖行；H2 单行语义仅首行）
+  const starts: number[] = []
+  let pos = lineStart
+  while (true) {
+    starts.push(pos)
+    if (firstLineOnly) break
+    const nl = value.indexOf('\n', pos)
+    if (nl === -1 || nl >= end) break
+    pos = nl + 1
+  }
+  for (let i = starts.length - 1; i >= 0; i--) {
+    ta.setSelectionRange(starts[i], starts[i])
+    insertTextAtSelection(ta, prefix)
+  }
+  // 恢复选区覆盖整段插入后的首行（含前缀），便于连续操作
+  const lastNl = value.indexOf('\n', starts[starts.length - 1])
+  const selEnd = (lastNl === -1 ? value.length : lastNl) + prefix.length * starts.length
+  ta.setSelectionRange(lineStart + prefix.length, selEnd)
+}
+
+// ---------- [[ 补全浮层（跨板块候选，只读 getSearchIndex，不新增解析正则） ----------
+
+const HINT_CAP = 8
+
+interface WikiHintState {
+  /** `[[` 之后第一个字符的位置（即待替换过滤词的起点） */
+  from: number
+  /** 过滤词（`[[` 到光标之间的文本） */
+  query: string
+  /** 触发时的光标位置（textarea 滚动时重定位用） */
+  caret: number
+}
+
+const hint = ref<WikiHintState | null>(null)
+const hintItems = ref<NoteDetail[]>([])
+const hintActive = ref(0)
+const hintPos = ref({ top: 0, left: 0 })
+let hintSeq = 0
+
+const HINT_BOARD_LABELS: Record<Board, string> = {
+  vocab: '词汇',
+  phrase: '短语',
+  sentence: '长难句',
+  grammar: '语法',
+}
+
+/**
+ * mirror div 测量光标像素位置：复制 textarea 的字体/盒样式，取 value 前 index 字符
+ * 渲染后末尾 span 的偏移（内容坐标），再减去 textarea 滚动量得可见坐标。
+ */
+function measureCaret(ta: HTMLTextAreaElement, index: number): { top: number; left: number } {
+  const style = getComputedStyle(ta)
+  const mirror = document.createElement('div')
+  for (const prop of [
+    'font-family', 'font-size', 'font-weight', 'font-style', 'line-height', 'letter-spacing',
+    'padding', 'border-width', 'border-style', 'box-sizing', 'white-space', 'overflow-wrap',
+    'word-break', 'tab-size', 'text-indent',
+  ]) {
+    mirror.style.setProperty(prop, style.getPropertyValue(prop))
+  }
+  mirror.style.position = 'absolute'
+  mirror.style.top = '-9999px'
+  mirror.style.left = '-9999px'
+  mirror.style.visibility = 'hidden'
+  mirror.style.width = `${ta.offsetWidth}px`
+  mirror.textContent = ta.value.slice(0, index)
+  const tail = document.createElement('span')
+  tail.textContent = ta.value.slice(index) || '\u200b'
+  mirror.appendChild(tail)
+  ta.parentElement?.appendChild(mirror)
+  const top = tail.offsetTop
+  const left = tail.offsetLeft
+  mirror.remove()
+  return { top, left }
+}
+
+/** 重定位浮层到光标下方（textarea 滚动/内容变化后调用） */
+function positionHint(): void {
+  const ta = sourceInput.value
+  const pane = ta?.parentElement
+  const h = hint.value
+  if (!ta || !pane || !h) return
+  const { top, left } = measureCaret(ta, h.caret)
+  const taRect = ta.getBoundingClientRect()
+  const paneRect = pane.getBoundingClientRect()
+  const lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 20
+  hintPos.value = {
+    top: taRect.top - paneRect.top + top - ta.scrollTop + lineHeight + 2,
+    left: taRect.left - paneRect.left + left - ta.scrollLeft,
+  }
+}
+
+/** 检测光标前未闭合 `[[`：命中则开/更新浮层，失配（输入 `]]`、换行、移动出去）关闭 */
+function detectWikiHint(): void {
+  const ta = sourceInput.value
+  if (!ta) return
+  const caret = ta.selectionStart
+  const m = /\[\[([^\[\]\n]*)$/.exec(ta.value.slice(0, caret))
+  if (!m) {
+    closeWikiHint()
+    return
+  }
+  const query = m[1]
+  if (hint.value && hint.value.caret === caret && hint.value.query === query) return
+  hint.value = { from: caret - query.length, query, caret }
+  positionHint()
+  void fillHintItems(query)
+}
+
+async function fillHintItems(query: string): Promise<void> {
+  const seq = ++hintSeq
+  try {
+    const index = await getSearchIndex()
+    // 等待期间浮层已关/过滤词已变/更新请求已更新 → 丢弃本轮结果
+    if (!hint.value || hint.value.query !== query || seq !== hintSeq) return
+    const q = query.trim().toLowerCase()
+    const scored: { note: NoteDetail; rank: number }[] = []
+    for (const note of index) {
+      const title = note.title.toLowerCase()
+      const slug = note.slug.toLowerCase()
+      let rank = -1
+      if (!q) rank = 2
+      else if (title.startsWith(q) || slug.startsWith(q)) rank = 0
+      else if (title.includes(q) || slug.includes(q)) rank = 1
+      if (rank >= 0) scored.push({ note, rank })
+    }
+    scored.sort((a, b) => a.rank - b.rank)
+    hintItems.value = scored.slice(0, HINT_CAP).map((s) => s.note)
+    hintActive.value = 0
+  } catch {
+    hintItems.value = []
+  }
+}
+
+function closeWikiHint(): void {
+  hint.value = null
+  hintItems.value = []
+  hintActive.value = 0
+}
+
+/** 插入候选：替换 `[过滤词` 中的过滤词为 `{目标}]]`——vocab 目标裸 slug、非 vocab 带 board/ 前缀 */
+function insertWikiHint(item: NoteDetail): void {
+  const ta = sourceInput.value
+  const h = hint.value
+  if (!ta || !h) return
+  const target = item.board === 'vocab' ? item.slug : `${item.board}/${item.slug}`
+  ta.focus()
+  ta.setSelectionRange(h.from, Math.max(ta.selectionStart, h.from))
+  insertTextAtSelection(ta, `${target}]]`)
+  closeWikiHint()
+}
+
+/**
+ * textarea 键盘处理：补全开启时 ↑↓/Enter/Tab/Esc 优先（Esc 阻断向上传播，不触发页面级行为）；
+ * Tab 补全开启=接受当前候选（编辑器惯例），关闭=插入两空格缩进。
+ */
+function onSourceKeydown(e: KeyboardEvent): void {
+  if (hint.value) {
+    const count = hintItems.value.length
+    if (e.key === 'ArrowDown' && count) {
+      e.preventDefault()
+      hintActive.value = (hintActive.value + 1) % count
+      return
+    }
+    if (e.key === 'ArrowUp' && count) {
+      e.preventDefault()
+      hintActive.value = (hintActive.value - 1 + count) % count
+      return
+    }
+    if ((e.key === 'Enter' || e.key === 'Tab') && count) {
+      e.preventDefault()
+      e.stopPropagation()
+      insertWikiHint(hintItems.value[hintActive.value])
+      return
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopPropagation()
+      closeWikiHint()
+      return
+    }
+  }
+  if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault()
+    const ta = sourceInput.value
+    if (ta) insertTextAtSelection(ta, '  ')
+  }
+}
+
+// ---------- 预览同步滚动（桌面分屏）：textarea 滚动比例单向映射到预览容器 ----------
+
+const isMobileViewport =
+  typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 767px)') : null
+let previewRaf = 0
+
+function syncPreviewScroll(): void {
+  if (previewRaf) return
+  previewRaf = window.requestAnimationFrame(() => {
+    previewRaf = 0
+    const ta = sourceInput.value
+    const pv = previewPane.value
+    if (!ta || !pv) return
+    const taMax = ta.scrollHeight - ta.clientHeight
+    const pvMax = pv.scrollHeight - pv.clientHeight
+    if (taMax <= 0 || pvMax <= 0) return
+    pv.scrollTop = (ta.scrollTop / taMax) * pvMax
+  })
+}
+
+function onSourceScroll(): void {
+  // textarea 滚动时浮层跟随光标重定位
+  if (hint.value) positionHint()
+  if (isMobileViewport?.matches) return
+  syncPreviewScroll()
 }
 
 // ---------- 拖入 md 文件替换源码 ----------
@@ -240,6 +509,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.clearTimeout(draftTimer)
   window.clearTimeout(previewTimer)
+  window.cancelAnimationFrame(previewRaf)
   window.removeEventListener('keydown', onKeyDown)
 })
 
@@ -271,6 +541,69 @@ watch(() => route.params, load)
     </header>
 
     <div class="edit-toolbar">
+      <!-- 格式工具条（§9）：图标按钮，插入只改 textarea 文本，保存路径不变 -->
+      <div class="format-toolbar" role="toolbar" aria-label="Markdown 格式工具条">
+        <button
+          type="button"
+          class="tool-btn"
+          title="加粗 **文本**"
+          aria-label="加粗"
+          @mousedown.prevent
+          @click="wrapSelection('**', '**', '文本')"
+        >
+          <Icon name="bold" :size="16" />
+        </button>
+        <button
+          type="button"
+          class="tool-btn"
+          title="斜体 *文本*"
+          aria-label="斜体"
+          @mousedown.prevent
+          @click="wrapSelection('*', '*', '文本')"
+        >
+          <Icon name="italic" :size="16" />
+        </button>
+        <button
+          type="button"
+          class="tool-btn"
+          title="行内代码 `文本`"
+          aria-label="行内代码"
+          @mousedown.prevent
+          @click="wrapSelection('`', '`', '代码')"
+        >
+          <Icon name="code" :size="16" />
+        </button>
+        <button
+          type="button"
+          class="tool-btn"
+          title="引用 > （行首）"
+          aria-label="引用"
+          @mousedown.prevent
+          @click="prefixLines('> ')"
+        >
+          <Icon name="quote" :size="16" />
+        </button>
+        <button
+          type="button"
+          class="tool-btn"
+          title="二级标题 ## （行首）"
+          aria-label="二级标题"
+          @mousedown.prevent
+          @click="prefixLines('## ', true)"
+        >
+          <Icon name="h2" :size="16" />
+        </button>
+        <button
+          type="button"
+          class="tool-btn"
+          title="词条链接 [[词条]]"
+          aria-label="插入词条链接"
+          @mousedown.prevent
+          @click="wrapSelection('[[', ']]', '词条')"
+        >
+          <Icon name="wiki" :size="16" />
+        </button>
+      </div>
       <div class="view-chips" role="tablist" aria-label="源码/预览切换">
         <button
           type="button"
@@ -321,13 +654,46 @@ watch(() => route.params, load)
     >
       <div class="pane pane-source" :class="{ active: viewMode === 'source' }">
         <textarea
+          ref="sourceInput"
           v-model="draft"
           class="source-input"
           spellcheck="false"
           aria-label="Markdown 源码"
+          @keydown="onSourceKeydown"
+          @input="detectWikiHint"
+          @click="detectWikiHint"
+          @blur="closeWikiHint"
+          @scroll.passive="onSourceScroll"
         />
+        <!-- [[ 补全浮层（§9）：absolute 于 .pane-source，z-drop 层；
+             候选项 mousedown.prevent 保 textarea 焦点（blur 先关浮层会吞掉 click） -->
+        <ul
+          v-if="hint && hintItems.length"
+          class="wiki-hint"
+          role="listbox"
+          aria-label="词条链接候选"
+          :style="{ top: `${hintPos.top}px`, left: `${hintPos.left}px` }"
+        >
+          <li
+            v-for="(item, i) in hintItems"
+            :key="`${item.board}/${item.slug}`"
+            role="option"
+            :aria-selected="i === hintActive"
+            :class="{ active: i === hintActive }"
+          >
+            <button
+              type="button"
+              class="wiki-hint-item"
+              @mousedown.prevent
+              @click="insertWikiHint(item)"
+            >
+              <span class="wiki-hint-title">{{ item.title }}</span>
+              <span class="wiki-hint-badge">{{ HINT_BOARD_LABELS[item.board] }}</span>
+            </button>
+          </li>
+        </ul>
       </div>
-      <div class="pane pane-preview" :class="{ active: viewMode === 'preview' }">
+      <div ref="previewPane" class="pane pane-preview" :class="{ active: viewMode === 'preview' }">
         <MarkdownViewer :body="previewSrc" :interactive="false" />
       </div>
     </div>
@@ -423,14 +789,93 @@ watch(() => route.params, load)
   cursor: default;
 }
 
-/* 移动端「源码/预览」chip，参考板块页搜索框 chip 样式 */
+/* 编辑工具行：桌面只显示格式工具条；移动端右侧追加源码/预览 chips（既有行为） */
 .edit-toolbar {
-  display: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+}
+
+.format-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.tool-btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.tool-btn:hover {
+  color: var(--color-accent);
+  background: var(--color-surface-2);
 }
 
 .view-chips {
+  display: none;
+  flex-shrink: 0;
+}
+
+/* [[ 补全浮层（§9）：z-drop 层，光标下方 absolute 定位（坐标由 mirror div 测量注入） */
+.wiki-hint {
+  position: absolute;
+  z-index: var(--z-drop);
+  min-width: 200px;
+  max-width: 300px;
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.wiki-hint li.active .wiki-hint-item {
+  background: var(--color-accent-soft);
+}
+
+.wiki-hint-item {
   display: flex;
-  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  color: var(--color-text);
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.wiki-hint-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wiki-hint-badge {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
 }
 
 .chip {
@@ -513,6 +958,7 @@ watch(() => route.params, load)
 @media (prefers-reduced-motion: no-preference) {
   .save-btn:active,
   .chip:active,
+  .tool-btn:active,
   .banner-close:active,
   .banner-action:active {
     transform: scale(0.98);
@@ -555,6 +1001,7 @@ watch(() => route.params, load)
 }
 
 .pane-source {
+  position: relative; /* 补全浮层的定位上下文 */
   display: flex;
 }
 
@@ -598,6 +1045,11 @@ watch(() => route.params, load)
   .edit-page {
     height: auto;
     min-height: 60vh;
+  }
+
+  .view-chips {
+    display: flex;
+    gap: var(--space-2);
   }
 
   .edit-toolbar {

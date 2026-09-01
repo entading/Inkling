@@ -3,7 +3,8 @@
  * 全站线性图标（§4）：内联注册 path 数据，不引图标库。
  * 风格与既有喇叭/放大镜一致：viewBox 0 0 24 24、stroke currentColor、
  * stroke-width 1.8、fill none、圆角端点（圆点类图标局部 fill currentColor）。
- * copy/check/sun/moon/monitor/list 供 M4'/M5' 预注册，本里程碑不应用。
+ * copy/check/sun/moon/monitor/list 供 M4'/M5' 预注册；bold/italic/code/quote/h2/wiki
+ * 为 M5' 编辑器格式工具条注册（M2' 已注册的 plus/arrow-up 分别供 M5' FAB/回顶使用）。
  */
 const ICONS = {
   home: '<path d="m3 10.5 9-7.5 9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6a2 2 0 0 1 4 0v6h4a1 1 0 0 0 1-1V9.5"/>',
@@ -30,6 +31,12 @@ const ICONS = {
   moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
   monitor: '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
   list: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
+  bold: '<path d="M6 12h9a4 4 0 0 1 0 8H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h7a4 4 0 0 1 0 8"/>',
+  italic: '<line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/>',
+  code: '<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>',
+  quote: '<path d="M10 11H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4"/><path d="M20 11h-4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4"/>',
+  h2: '<path d="M4 12h8"/><path d="M4 6v16"/><path d="M12 6v16"/><path d="M17 20c0-3.5 4-2.5 4-5.5 0-1.7-1.3-2.5-2.5-2.5-1.1 0-2 .5-2.5 1.2"/>',
+  wiki: '<path d="M9 4H4v16h5"/><path d="M15 4h5v16h-5"/><path d="M8 12h8"/>',
 } as const
 
 export type IconName = keyof typeof ICONS
