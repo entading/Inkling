@@ -61,6 +61,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
       </RouterLink>
 
       <nav class="nav">
+        <!-- 分区分组（UX 打磨）：导航顶部嵌线，与动作区（搜索/新建）分界、与下方「更多」对称 -->
+        <div class="nav-sep">导航</div>
         <RouterLink to="/" class="nav-item" exact-active-class="active">
           <Icon :name="NAV_ICONS['/']" :size="16" />
           <span>首页</span>
@@ -75,6 +77,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
           <Icon :name="NAV_ICONS[r.path]" :size="16" />
           <span>{{ r.label }}</span>
         </RouterLink>
+
+        <!-- 分区分组（UX 打磨）：文字嵌线（两侧伪元素拉线），库内容与工具区（标签/设置）分界 -->
+        <div class="nav-sep">更多</div>
+
         <RouterLink to="/tags" class="nav-item" active-class="active">
           <Icon :name="NAV_ICONS['/tags']" :size="16" />
           <span>标签</span>
@@ -158,8 +164,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
   width: 28px;
   height: 28px;
   border-radius: var(--radius-md);
-  background: var(--color-accent);
+  background: var(--gradient-brand);
   color: var(--color-on-accent);
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
   font-weight: 700;
   display: grid;
   place-items: center;
@@ -233,10 +241,30 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
 }
 
 .nav {
-  margin-top: var(--space-6);
+  /* 顶部间距交给首个 .nav-sep 的 margin（嵌线紧随新建按钮之后），避免双重叠加 */
+  margin-top: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+/* 分区分组（UX 打磨）：文字嵌线——两侧 ::before/::after 拉出 1px 线，文字居中；
+   上 12px 拉开与前组节奏，下 8px 接工具区首项 */
+.nav-sep {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-3) var(--space-3) var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.nav-sep::before,
+.nav-sep::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
 }
 
 .nav-item {
