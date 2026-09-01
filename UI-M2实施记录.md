@@ -172,3 +172,13 @@
 - 附带提交：M1' 独立审查会话遗留未提交的 `UI-M1实施记录.md`「审查」节与 `AGENTS.md` M1' 进度行（本会话开始前即存在于工作区，单独 `docs:` 提交以清历史）
 - 本记录 + `UI优化设计方案.md` §12 标注 + AGENTS.md M2' 回写 + `UI-M2截图/`（12 张）：`docs:` 提交
 - 截图：home-light / home-dark / note-light / note-dark / note-code-light / grammar-dark-full / tags-light / tags-dark / empty-state / mobile-home-dark / mobile-note-light / mobile-settings-dark
+
+## 审查（第三轮，2026-08-31，独立审查会话）
+
+对已提交状态（HEAD = 2abe757）独立复验，**结论：通过验收，零代码缺陷**。核实范围与结果：
+
+- [x] **提交隔离与禁区**：`91fddfb`（621 文件 = 27 代码 + 592 woff2 + OFL + lockfile）无 server/、notes/ 卷入；`4cfda21..HEAD` 对 server/、markdown.ts、theme.ts、tts.ts、index.html 零改动；notes/ 无临时词条残留；组件散写色归零。
+- [x] **代码核对**：tokens.css（`--font-serif` 照抄 §3 / `--text-body` / `--font-mono` / 标签 8 组浅深令牌 + hover overlay / 全局应用类 `.tag-pair-{0..7}`）、MarkdownViewer `.note-body`（衬线/17px/1.8/0.01em/autospace/orphans:2、code-pre 等宽、blockquote surface-2+1.6、链接 text-decoration 迁移）、Icon.vue（24 枚规范注册）、tagColor.ts djb2、§12 标注与 AGENTS 三条新铁律回写，逐项与设计文档一致。
+- [x] **独立实测（browser-use）**：`npm run build` 通过且产物 hash 与记录一致；衬线边界临时词条全项通过（IPA 无衬线 / code-pre ui-monospace / blockquote #f3f4f6+accent 边条+27.2px 行高 / md 链接 underline+3px+1px / wiki dashed / h2 17.6px+字距 normal / strong 衬线继承）；深色下衬线笔画清晰（语法长文整页截图复核，粗体 700、斜体 Cambria）；首页板块 chip 浅色 soft 四色与深色 rgba 四色逐一精确命中 M1' 变体；侧栏 7 图标、移动底部 5 图标；标签 tag-pair-N 生效；空状态插画+清除搜索 CTA 点击还原列表（rows 0→7）；375×812 零横滚；dev 与 preview 双源字体按需加载均 24 片命中、preview 全绝对路径、`fonts.check` 经显式 load 后 true（与复检方法论沉淀一致）。
+- [x] **残留清理**：审查会话临时词条（m2-review-check，文件系统建删）与两源 localStorage 均已清零，主题恢复 system。
+- [备注] 审查中 blockquote border-left computed 读数 2.667px（CSS 源为 3px）属 IAB computed 残影（同 [[已知 IAB quirk]]），以 CSS 源 + 视觉截图为准；另审查会话遇 4173 端口孤儿进程（上轮审查残留 preview），精确单杀后重启，与实施无关。
