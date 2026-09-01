@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { tagPairIndex } from '../lib/tagColor'
+import { tagColorIndex } from '../lib/tagColor'
 
 const props = defineProps<{ tag: string }>()
 
-/** hash(tag)%8 → tokens.css 的 .tag-pair-N 应用类（底色/文字色），hover 叠加 --tag-hover-overlay */
-const pairClass = computed(() => `tag-pair-${tagPairIndex(props.tag)}`)
+/** 注册表优先、djb2 hash 回落（v1.1）→ tokens.css 的 .tag-pair-N 应用类，hover 叠加 --tag-hover-overlay */
+const pairClass = computed(() => `tag-pair-${tagColorIndex(props.tag)}`)
 </script>
 
 <template>

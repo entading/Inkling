@@ -13,6 +13,7 @@ import {
 import { buildTemplate } from './templates.js'
 import { LAN_STATE, buildServerInfo } from './settings.js'
 import { commitNoteDeletion } from './gitCommit.js'
+import { getTagRegistry, upsertTag } from './tagRegistry.js'
 
 /** 由 index.ts 注入：请求切换局域网监听（后台执行，先应答后 close→re-listen） */
 export interface ServerHooks {
@@ -109,6 +110,41 @@ export function registerRoutes(app: FastifyInstance, hooks?: ServerHooks): void 
     // 应答反映目标状态；若切换失败服务端会回滚，前端核对 /api/server-info 提示。
     hooks?.toggleLan(body.lanEnabled)
     return buildServerInfo(body.lanEnabled)
+  })
+
+  // 标签注册表（v1.1 T1）：注册在 registerRoutes 内，LAN 切换重建实例后随本函数重注册
+  app.get('/api/tags', async () => getTagRegistry())
+
+  app.post('/api/tags', async (req, reply) => {
+    const body = req.body as { tag?: unknown; color?: unknown } | null | undefined
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'body 必须为 { tag: string, color: number } 对象' })
+    }
+    if (typeof body.tag !== 'string') {
+      return reply.code(400).send({ error: 'tag 必须为字符串' })
+    }
+    const tag = body.tag.trim()
+    if (!tag) {
+      return reply.code(400).send({ error: 'tag 不能为空白' })
+    }
+    if (tag.length > 32) {
+      return reply.code(400).send({ error: 'tag 不能超过 32 字符' })
+    }
+    if (
+      typeof body.color !== 'number' ||
+      !Number.isInteger(body.color) ||
+      body.color < 0 ||
+      body.color > 7
+    ) {
+      return reply.code(400).send({ error: 'color 必须为 0–7 的整数' })
+    }
+    try {
+      upsertTag(tag, body.color)
+    } catch (err) {
+      req.log.error(err)
+      return reply.code(500).send({ error: `写入失败：${err instanceof Error ? err.message : String(err)}` })
+    }
+    return getTagRegistry()
   })
 
   app.post('/api/notes', async (req, reply) => {
