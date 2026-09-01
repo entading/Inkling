@@ -107,5 +107,21 @@
 5. **`[[` 补全过滤词不含 `[`/`]`/换行**：wiki 目标本就不允许这些字符（isLegalWikiText 语义），输入即关闭浮层属预期。
 6. **板块页搜索词平时不写 URL**（既有行为保留）：仅当 tags/sort 变更触发 pushRouteQuery 时，已输入的 q 随之入 URL（保证 AND 组合与分享语义完整）。
 7. **Home 最近添加不跟随密度切换**：密度语义限于板块页浏览场景（决策记录于执行计划 B4）。
+8. **含逗号的标签名在 `?tags=` URL 往返会断裂**（split(',') 语义）：自建知识库低概率场景，chips 内存态不受影响，仅 URL 分享/回退失真——复检记录为已知限制不修（修复需自定义分隔符或编码方案，收益不匹配）。
+
+## 审查（第二轮，2026-09-01，复检会话）
+
+对已提交状态（HEAD = cd5cbea）独立复验，**结论：通过验收；发现并修复 2 处编辑器缺口（`524df59`）**。核实范围与结果：
+
+- [x] **提交隔离与禁区**：`570a213`（feat）触碰文件 = App.vue / FloatingActions.vue（新）/ Icon.vue / Board.vue / EditView.vue 恰 5 项；`1139467..HEAD` 对 **server/、notes/、index.html、package.json（前后端+lockfile）、lib 全部（markdown/theme/tts/search/stagger/tagColor/backlinks）、CommandPalette、NoteView、Skeleton、TagBadge、SearchPanel、EmptyState、AZIndex、MarkdownViewer、NewNote、Settings、Home、Tags、TagDetail、NotFound、main.ts、router.ts、api.ts** 零改动；notes/ 零变更、工作区无未跟踪笔记残留；5 个交接提示词保持未跟踪。
+- [x] **静态纪律**：新代码散写 hex/rgba 零命中；CSS ms 字面值零命中（grep 命中均为注释与 v1 既有 JS 定时器）；z-index 全令牌（z-nav/z-drop）；localStorage 仅新增 `en_tool:density`（前缀铁律）；媒体查询全字面量（767px）+ no-preference 块；prefers-color-scheme 零分支；依赖零变更。
+- [x] **代码逐文件核对**：insertTextAtSelection（execCommand 优先/降级派发 input）/prefixLines（行首偏移收集、从后向前插、选区恢复公式逐项推演无误）/insertWikiHint（from+caret 竞态无懈、vocab 裸 slug 语义）/fillHintItems（seq 守卫 + 错误清空）/measureCaret（mirror 不入布局流）/Board pushRouteQuery↔syncFromRoute 往返/FloatingActions（listener+rAF 卸载清理、reduce 点击时读取）。
+- [x] **发现并修复 R-1（IME 组合守卫缺失）**：`onSourceKeydown` 未做 `isComposing || keyCode === 229` 早退——拼音组字中 Enter 确认候选/↑↓ 选字/Esc 取消会被补全劫持（CommandPalette 有同款守卫，此处漏配）。修复后实测：合成 `isComposing:true` 的 Enter → 浮层保持开、零插入；对照组 `isComposing:false` → 正常插入 `[[twinkle]]`。
+- [x] **发现并修复 R-2（补全浮层水平钳制）**：positionHint 的 left 未钳制，行尾触发时浮层右缘可溢出 pane，窄窗口有横滚风险——加 `min(left, pane.clientWidth − 320)` 钳制；实测长行触发 `hintRight(616) ≤ paneRight(736)`。
+- [x] **回归电池**（dev，修复后构建）：无改动 Ctrl+S → 0 PUT；改动 → 1 PUT + 「已保存 ✓」；工具条加粗包裹；Tab 两空格；`[[per` 补全 + Esc 关闭；FM 软保护（损坏草稿 → warn 横幅 → 「恢复」还原 frontmatter）；板块 `?tags=cet6` 直达 3 条 + chip 激活、点 cet4 → OR `?tags=cet4`、密度 compact 类+localStorage；Ctrl+K 面板开（body 锁滚）/Esc 关；阅读页 E → 编辑页；375 视口 FAB 出现（z=40）点击 → /new、/new 隐藏。
+- [x] **preview 复核（4173，修复产物 `index-Bo4Ad05o.js`）**：生产 bundle 正确加载，`?tags=cet6` 筛选直达 3 条 + chip 激活态。
+- [x] **环境事件澄清（重要，非应用缺陷）**：复检中两次「标签页挂起（evaluate 超时）」根因 = **复检流程自身触发 FM 软保护的 window.confirm 模态框**——Tab 在位置 0 插入两空格使草稿变成 `  ---` 开头 → extractFrontmatter 判空 → fmLost → 此后每次 Ctrl+S 弹 confirm；**IAB 原生 confirm 打开期间 evaluate/locator 全部阻塞**（表现为超时假死），且首轮 getJsDialog 探针两分支均静默返回未发现对话框（if/else 内表达式不外显的写法坑）。dismiss 后页面立即恢复、新标签页加载同一编辑页正常。FM 保护本身工作完全符合设计（确认对话框出现 = 该验收项的活体再现）。
+- [x] **复检自身残留清理**：临时词条 m5-rc 文件系统建删、notes/ 零 git 痕迹；`en_tool:draft:vocab:m5-rc` 由保存成功路径与手动清理双保险归零；localStorage 终态仅余 `en_tool:theme=system` + `en_tool:density=cozy`（合法偏好键）；验证用 stub/垫片零落盘（grep 自查）。
+- [备注] **复检会话 IAB 健康度**：两轮 rAF 探针健康（34–50 帧/200–300ms），rAF 依赖路径在健康窗口完成；「假死」均确认源于模态 confirm 而非遮挡节流（与本轮实施会话的 rAF 停摆事件性质不同，勿混淆）。
 
 
