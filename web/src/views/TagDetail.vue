@@ -2,7 +2,11 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import NoteList from '../components/NoteList.vue'
+import TagPalette from '../components/TagPalette.vue'
 import { BOARD_LABELS, BOARD_ORDER, getSearchIndex } from '../lib/search'
+import { api } from '../api'
+import { applyTagRegistry } from '../lib/tagRegistry'
+import { tagColorIndex } from '../lib/tagColor'
 import type { NoteDetail } from '../api'
 import { useStaggerArm } from '../lib/stagger'
 
@@ -42,6 +46,27 @@ const groups = computed<Group[]>(() => {
   return result
 })
 
+// ---------- 自定义颜色（v1.1 体验迭代）：注册表优先、djb2 回落，点色即改 ----------
+
+const currentColor = computed(() => tagColorIndex(tag.value))
+
+const recoloring = ref(false)
+const recolorError = ref('')
+
+async function recolor(color: number): Promise<void> {
+  if (recoloring.value) return
+  recoloring.value = true
+  recolorError.value = ''
+  try {
+    const reg = await api.upsertTag(tag.value, color)
+    applyTagRegistry(reg)
+  } catch (e) {
+    recolorError.value = `改色失败：${e instanceof Error ? e.message : String(e)}`
+  } finally {
+    recoloring.value = false
+  }
+}
+
 onMounted(async () => {
   try {
     index.value = await getSearchIndex()
@@ -61,6 +86,12 @@ onMounted(async () => {
       </h1>
       <p class="page-meta">{{ total }} 条词条</p>
     </header>
+
+    <section class="recolor-block" aria-label="自定义颜色">
+      <span class="recolor-label">自定义颜色</span>
+      <TagPalette :model-value="currentColor" @select="recolor" />
+      <span v-if="recolorError" class="recolor-error" role="alert">{{ recolorError }}</span>
+    </section>
 
     <p v-if="error" class="error">加载失败：{{ error }}</p>
     <p v-else-if="loading" class="hint">加载中…</p>
@@ -87,7 +118,30 @@ onMounted(async () => {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+/* 自定义颜色行（v1.1 体验迭代）：注册表优先、djb2 回落，点色即改全站生效 */
+.recolor-block {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
   margin-bottom: var(--space-6);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.recolor-label {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.recolor-error {
+  font-size: var(--text-sm);
+  color: var(--color-danger);
 }
 
 .page-title {

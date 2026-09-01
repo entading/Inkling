@@ -90,27 +90,28 @@ async function submitCreate(): Promise<void> {
   }
 }
 
-// ---------- ③ 注册表标签改色入口（点击展开色板，点色即时 POST） ----------
+// ---------- ③ 自定义颜色行（常显色板，点色即 POST，无展开/收起步骤） ----------
 
-const expandedTag = ref<string | null>(null)
 const recoloring = ref(false)
-const manageError = ref('')
+const recolorErrorFor = ref<string | null>(null)
+const recolorError = ref('')
 
-function toggleExpand(name: string): void {
-  expandedTag.value = expandedTag.value === name ? null : name
-  manageError.value = ''
+/** 注册表标签当前词条数（0 = 未使用），用于行内元信息与云标签呼应 */
+function countOf(name: string): number {
+  return unionTags.value.find((t) => t.tag === name)?.count ?? 0
 }
 
 async function recolor(name: string, color: number): Promise<void> {
   if (recoloring.value) return
   recoloring.value = true
-  manageError.value = ''
+  recolorErrorFor.value = null
+  recolorError.value = ''
   try {
     const reg = await api.upsertTag(name, color)
     applyTagRegistry(reg)
-    expandedTag.value = null
   } catch (e) {
-    manageError.value = `改色失败：${e instanceof Error ? e.message : String(e)}`
+    recolorErrorFor.value = name
+    recolorError.value = `改色失败：${e instanceof Error ? e.message : String(e)}`
   } finally {
     recoloring.value = false
   }
@@ -124,7 +125,7 @@ async function recolor(name: string, color: number): Promise<void> {
       <p class="page-meta">{{ unionTags.length }} 个标签</p>
     </header>
 
-    <!-- ① 新增 / 改色区块（v1.1）：upsert——已存在仅更新颜色 -->
+    <!-- ① 新增 / 指定颜色区块（v1.1）：upsert——新名称即创建，已有名称则更新颜色 -->
     <section class="create-block" aria-label="创建或改色标签">
       <div class="create-row">
         <input
@@ -140,6 +141,7 @@ async function recolor(name: string, color: number): Promise<void> {
           创建标签
         </button>
       </div>
+      <p class="create-hint">新名称将创建标签并应用所选颜色；输入已有名称则把该标签更新为所选颜色。</p>
       <p v-if="feedback" class="feedback" :class="feedback.ok ? 'is-ok' : 'is-error'" role="status">
         {{ feedback.text }}
       </p>
@@ -171,27 +173,28 @@ async function recolor(name: string, color: number): Promise<void> {
       />
     </template>
 
-    <!-- ③ 注册表标签改色：chip 点击展开色板，点色即时 POST（导航走云标签，此处专注改色） -->
-    <section v-if="registryNames.length" class="registry-manage" aria-label="注册表标签改色">
-      <h2 class="section-title">注册表标签</h2>
-      <p class="section-hint">点击标签展开色板改色；颜色即时生效并跨设备持久化。</p>
-      <div class="registry-list">
-        <div v-for="name in registryNames" :key="name" class="registry-item">
-          <button
-            type="button"
-            class="registry-chip"
+    <!-- ③ 自定义颜色：常显色板行，点色即改（详情页 /tags/:tag 亦提供同款取色行） -->
+    <section v-if="!loading && !error && unionTags.length" class="registry-manage" aria-label="自定义颜色标签">
+      <h2 class="section-title">自定义颜色</h2>
+      <p class="section-hint">点击色块立即改色；颜色即时生效并跨设备持久化。</p>
+      <div v-if="registryNames.length" class="registry-list">
+        <div v-for="name in registryNames" :key="name" class="color-row">
+          <span
+            class="row-chip"
             :class="`tag-pair-${registry[name].color}`"
-            :aria-expanded="expandedTag === name"
-            @click="toggleExpand(name)"
+            :title="countOf(name) === 0 ? '注册表标签，尚未用于任何词条' : `${countOf(name)} 条词条`"
           >
             {{ name }}
-          </button>
-          <div v-if="expandedTag === name" class="registry-palette">
-            <TagPalette :model-value="registry[name].color" @select="recolor(name, $event)" />
-            <p v-if="manageError" class="feedback is-error" role="alert">{{ manageError }}</p>
-          </div>
+            <span v-if="countOf(name) === 0" class="row-unused">未使用</span>
+            <span v-else class="row-count">{{ countOf(name) }}</span>
+          </span>
+          <TagPalette :model-value="registry[name].color" @select="recolor(name, $event)" />
+          <span v-if="recolorErrorFor === name" class="row-error" role="alert">{{ recolorError }}</span>
         </div>
       </div>
+      <p v-else class="section-empty">
+        尚无自定义颜色的标签——在上方为标签命名并选色后，可在此随时调整。
+      </p>
     </section>
   </div>
 </template>
@@ -286,6 +289,12 @@ async function recolor(name: string, color: number): Promise<void> {
   cursor: default;
 }
 
+.create-hint {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
 .feedback {
   margin: var(--space-3) 0 0;
   font-size: var(--text-sm);
@@ -361,37 +370,50 @@ async function recolor(name: string, color: number): Promise<void> {
 .registry-list {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
-.registry-item {
+/* 常显色板行：chip（当前色）+ 色板同行铺开，点色即改，无展开/收起步骤 */
+.color-row {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
 }
 
-/* 改色 chip：底色/文字色由 .tag-pair-N 提供，scoped 不设 background/color */
-.registry-chip {
+/* 行首 chip：底色/文字色由 .tag-pair-N 提供，scoped 不设 background/color */
+.row-chip {
   padding: 3px 14px;
   font-size: var(--text-sm);
-  font-family: inherit;
-  border: none;
   border-radius: var(--radius-full);
-  cursor: pointer;
-  transition: background-color var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
+  min-width: 88px;
+  text-align: center;
 }
 
-.registry-chip:hover {
-  background-image: linear-gradient(var(--tag-hover-overlay), var(--tag-hover-overlay));
+.row-count {
+  font-size: 0.7em;
+  opacity: 0.7;
+  margin-left: 4px;
 }
 
-.registry-palette {
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-surface-2);
-  border-radius: var(--radius-md);
+.row-unused {
+  font-size: 0.7em;
+  padding: 0 6px;
+  margin-left: 4px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-full);
+  opacity: 0.75;
+}
+
+.row-error {
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+}
+
+.section-empty {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  margin: 0;
 }
 
 .hint,
@@ -413,8 +435,7 @@ async function recolor(name: string, color: number): Promise<void> {
 
 /* 按压反馈（§6）：新增动画统一包在 no-preference 内 */
 @media (prefers-reduced-motion: no-preference) {
-  .submit-btn:active,
-  .registry-chip:active {
+  .submit-btn:active {
     transform: scale(0.98);
   }
 }
