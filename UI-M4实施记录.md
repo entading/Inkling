@@ -158,3 +158,19 @@
 5. **面板打开期间独占键盘**（含 Ctrl+S）：编辑页若开着面板按 Ctrl+S 不会保存——模态语义的预期行为，关闭面板即恢复。
 6. **目录点击不做 URL hash 同步**（偏离 #9）：刷新后回到页首。
 7. **命令面板索引依赖 `getSearchIndex()` 缓存**：索引拉取失败时词条搜索不可用（动作组不受影响），下次打开面板自动重试。
+
+## 审查（第二轮，2026-09-01，复检会话）
+
+对已提交状态独立复验，**结论：通过验收；发现并修复 2 处面板索引时效缺口（`67fa364`），清理 1 处复检自身残留**。核实范围与结果：
+
+- [x] **提交隔离与禁区**：`b476fa2`（feat，5 代码文件 +1147/-26）、`b6e28b9`（M3' 遗留补记）、`245d469`（docs，记录 + 9 截图 + §12 + AGENTS）；`a294773..HEAD` 对 **server/、notes/、index.html、package.json（前后端+lockfile）、lib 五件套（markdown/theme/tts/search/stagger）、backlinks.ts、Icon.vue、Skeleton.vue、NoteList.vue、SearchPanel.vue、EditView.vue、Settings.vue** 零改动；notes/ 9 个跟踪文件零变更、工作区无未跟踪笔记残留；4 个交接提示词保持未跟踪。
+- [x] **静态纪律**：新代码散写 hex/rgba 零命中；CSS ms 字面值零命中（仅 tokens.css 令牌定义）；组件内 prefers-color-scheme 零命中；z-index 全令牌（z-float/z-rail）；localStorage 无新增（NoteView 命中为 v1 既有草稿清理）；媒体查询全字面量（1280/767/no-preference）；依赖零变更。
+- [x] **代码逐文件核对**：CommandPalette（capture 段键盘独占含 IME 放行 / 焦点存还原 + Tab 困焦 / buildFuse threshold 0.35 与 keys 规格 / recent(5) / 主题动作 setPreference / body 锁滚含卸载兜底 / Teleport+aria 全套）；App.vue（Ctrl/Cmd+K 修饰键守卫 / 平台 kbd / 侧栏入口）；MarkdownViewer（flush:'post' 后处理幂等 / id 确定性唯一 / 容器级委托 / SVG 与 Icon.vue 同源注释）；NoteView（rAF 节流 passive / scrollspy 触底兜底 / 三列 grid 布局 / 上下篇并行拉取 + 竞态守卫 + encodeURIComponent / 快捷键 input+修饰键守卫 / Esc 优先级）；M3' 不变量（页面转场块、stagger-arm、按压反馈守卫、骨架屏）未被破坏。
+- [x] **发现并修复 R-1（索引迟到）**：面板打开后立即输入（索引未就绪）时 runSearch 早退后无重试，须再敲字符才出结果——ensureFuse 就绪后对非空 query 自动补跑。
+- [x] **发现并修复 R-2（索引失效不感知）**：fuse 建成后 ensureFuse 早退，新建/编辑/删除的 invalidateSearchIndex 对面板永不生效（旧索引 stale 至刷新）——去掉早退，每次打开走 getSearchIndex()（缓存命中零网络），数组引用变化才重建。复检新增约束已回写 AGENTS.md「命令面板铁律」。
+- [x] **R-1/R-2 确定性实测**（dev，stub 将 search-index 延迟 2s）：冷索引 + 开面板即输入 → 「搜索索引加载中…」→ 2s 后**自动出 2 命中**（不敲字符，fetch 恰 1 次）；UI 新建词条（invalidateSearchIndex）→ 面板搜「复检」→ 加载中 → 重拉后**命中新词条**（fetch 恰 2 次）。
+- [x] **回归电池**（重建临时长文）：TOC 8 项 / id 唯一 / 正文恒 720px / 零横滚 / 复制载荷逐字节一致 + copied 态 / E→编辑 / Esc→板块 / 上下篇 href 与创建新词条后的板块序动态一致（prev=m4-review-check、next=perseverance）/ 原生滚轮触底进度 **100%** + spy 末节 / 移动端四项（TOC 隐藏/进度/上下篇/零横滚）。
+- [x] **preview 复核（4173，含修复产物 index-BAfPZ5Um.js）**：面板打开 + abandon 搜索 2 命中、临时词条已从索引消失。
+- [x] **复检自身残留清理**：临时词条 ×2（m4-toc-check、m4-review-check）文件系统建删、零 git 痕迹；孤儿草稿 `en_tool:draft:vocab:…m4-review-check` 清理（复检经 UI 建词条后停留编辑页 >3s 触发 v1 既有草稿自动暂存，属预期行为非缺陷）；两 origin localStorage 仅余 `en_tool:theme=system`；临时验证代码零落盘。
+- [备注] **NewNote slug 观感**（非缺陷，观察项）：标题与手填 slug 同时存在时自动生成的 slug 前缀与手填值拼接（复检实测得到 `m4-复检临时词条m4-review-check`）——v1 既有 NewNote 行为，M4' 未触碰 NewNote，不在本里程碑处置范围。
+- [备注] **浏览器后退时面板保持打开**：面板挂 App 层不受路由变化影响，仅动作/Esc/遮罩/Ctrl+K 关闭——模态语义的可接受行为，如需「路由变化自动关」属 M5'+ 增强。
