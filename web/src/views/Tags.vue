@@ -516,14 +516,17 @@ async function submitCreate(): Promise<void> {
   border-radius: var(--radius-full);
 }
 
-/* 幽灵新建卡：虚线占位 → 点击原位展开表单 */
+/* 幽灵新建卡：虚线占位 → 点击原位展开表单；不设 min-height——Grid 行内默认
+   拉伸使其与同行标签卡等高（设了会撑高所在行，行高不一致） */
 .ghost-card {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: var(--space-3);
-  min-height: 104px;
+  /* 与标签卡自然高度（卡头+托盘，81px）对齐：单独成行时不矮于其他行；
+     同行有标签卡时 Grid 拉伸本已等高。卡面结构变更时需同步此值 */
+  min-height: 81px;
   padding: var(--space-4);
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-md);
