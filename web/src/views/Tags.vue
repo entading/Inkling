@@ -88,7 +88,17 @@ const colorIndex = (tag: string) => tagColorIndex(tag)
 // ---------- 入场 stagger（同 NoteList 配方：cap 前携带递增内联 delay，祖先 stagger-arm 门控） ----------
 
 const play = (i: number) => i < STAGGER_CAP
-const delay = (i: number) => ({ animationDelay: `calc(var(--stagger-step) * ${i})` })
+
+/** 卡内联注入 --card-hue/--card-wash（该卡文字色/洗底），供 tokens.css 的 --card-sheen
+ * 渐层按卡取色；stagger delay 一并注入 */
+function cardStyle(tag: string, i: number): Record<string, string> {
+  const style: Record<string, string> = {
+    '--card-hue': `var(--tag-${colorIndex(tag)}-c)`,
+    '--card-wash': `var(--tag-${colorIndex(tag)}-bg)`,
+  }
+  if (play(i)) style.animationDelay = `calc(var(--stagger-step) * ${i})`
+  return style
+}
 
 // ---------- 卡内点色即改 ----------
 
@@ -217,7 +227,7 @@ async function submitCreate(): Promise<void> {
           :key="t.tag"
           class="tag-card"
           :class="[`tag-pair-${colorIndex(t.tag)}`, { 'card-in': play(i) }]"
-          :style="play(i) ? delay(i) : undefined"
+          :style="cardStyle(t.tag, i)"
         >
           <div class="card-head">
             <h3 class="card-name">
@@ -401,14 +411,33 @@ async function submitCreate(): Promise<void> {
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
+  /* 渐层（迭代⑦）：--card-sheen 由 tokens.css 按主题定义，端点色经内联
+     --card-hue/--card-wash 随卡取色；只叠 background-image，不碰全局洗底 background-color */
+  background-image: var(--card-sheen);
   transition: transform var(--duration-fast) var(--ease-out),
     box-shadow var(--duration-fast) var(--ease-out);
 }
 
 /* hover 与 TagBadge 同策略：叠加 --tag-hover-overlay 强化洗底 + 轻浮起 */
+/* hover 强化层：::before 叠加 --tag-hover-overlay——若直接改 background-image 会
+   整体替换 --card-sheen 渐层，故独立为透明度过渡的覆盖层（pointer-events 穿透） */
+.tag-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+  background: var(--tag-hover-overlay);
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+  pointer-events: none;
+}
+
 .tag-card:hover {
   transform: translateY(-1px);
-  background-image: linear-gradient(var(--tag-hover-overlay), var(--tag-hover-overlay));
+}
+
+.tag-card:hover::before {
+  opacity: 1;
 }
 
 /* 两段式卡头（迭代⑥恢复③排布）：名称左·元信息右 */
