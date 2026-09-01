@@ -45,9 +45,10 @@ onBeforeUnmount(() => window.clearTimeout(pulseTimer))
       :title="`色板 ${c + 1}`"
       @click="onSelect(c)"
     >
-      <!-- 色点必须由内层 span 承接 .tag-pair-N：scoped 类特异性（含 [data-v]）压过全局应用类，
+      <!-- 色点必须由内层 span 承接 .tag-dot-N（主题感知应用类：浅色粉彩洗底/
+           深色亮色档，见 tokens.css）：scoped 类特异性（含 [data-v]）压过全局应用类，
            本组件任何 scoped 规则都不得给 dot 设 background/color（M2' 铁律的按钮变体） -->
-      <span class="swatch-dot" :class="[`tag-pair-${c}`, size === 'sm' && 'swatch-dot-sm']" />
+      <span class="swatch-dot" :class="[`tag-dot-${c}`, size === 'sm' && 'swatch-dot-sm']" />
     </button>
   </div>
 </template>
