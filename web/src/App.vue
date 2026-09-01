@@ -2,6 +2,7 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import CommandPalette from './components/CommandPalette.vue'
+import FloatingActions from './components/FloatingActions.vue'
 import Icon, { type IconName } from './components/Icon.vue'
 import { boardRoutes } from './router'
 
@@ -92,6 +93,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
 
     <!-- 命令面板（§7）：Teleport body，全键盘可用 -->
     <CommandPalette :open="paletteOpen" @close="paletteOpen = false" />
+
+    <!-- 浮动操作（M5'）：移动端 FAB 新建 + 桌面/移动回顶 -->
+    <FloatingActions />
 
     <!-- 移动端底部导航：替代桌面侧边栏（设计 3.3），标签/设置收进首页右上角菜单 -->
     <nav class="bottom-nav" aria-label="移动端主导航">
@@ -275,7 +279,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
   }
 
   .content {
-    padding: var(--space-4) var(--space-5) calc(72px + env(safe-area-inset-bottom));
+    /* 底部余量 = 底导 72px + FAB 顶缘（120px）+ 16px 防遮挡（M5'）+ 安全区 */
+    padding: var(--space-4) var(--space-5) calc(136px + env(safe-area-inset-bottom));
   }
 
   .bottom-nav {
