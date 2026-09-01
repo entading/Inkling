@@ -45,9 +45,11 @@ const fuse = shallowRef<Fuse<NoteDetail> | null>(null)
 const indexLoading = ref(false)
 let lastFuseSource: NoteDetail[] | null = null
 
-/** 索引就绪即建 Fuse（缓存 Promise 复用，不重复拉取）；数组引用变化（写盘失效后）才重建 */
+/** 索引就绪即建 Fuse：getSearchIndex() 复用缓存（命中零网络），写盘失效后自动重拉并
+ * 重建（数组引用变化才重建，删除/新建词条即时反映）；就绪后若已有未空 query 立即补跑
+ * 一次搜索（索引迟到/重拉场景，用户无需再敲字符） */
 async function ensureFuse(): Promise<void> {
-  if (fuse.value || indexLoading.value) return
+  if (indexLoading.value) return
   indexLoading.value = true
   try {
     const notes = await getSearchIndex()
@@ -55,6 +57,7 @@ async function ensureFuse(): Promise<void> {
       lastFuseSource = notes
       fuse.value = buildFuse(notes, ['title', 'ipa', 'tags', 'slug'])
     }
+    if (query.value.trim()) runSearch()
   } catch {
     fuse.value = null
   } finally {
