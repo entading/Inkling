@@ -10,10 +10,10 @@ import TagPalette from '../components/TagPalette.vue'
 import { useStaggerArm, STAGGER_CAP } from '../lib/stagger'
 
 /**
- * 标签页 = 色卡墙（v1.1 体验迭代第 2 轮，方案 A·全染）：
- * 云标签与自定义颜色区合并为一张画布——每张全染色卡承担颜色身份（tag-pair 洗底）、
- * 浏览导航（整卡 stretched-link 进详情）与改色（卡内常显色板）三职；末尾虚线
- * 幽灵卡承担创建（点击原位展开表单，upsert 语义不变）。
+ * 标签页 = 色卡墙（v1.1 体验迭代第 2/3/4 轮，方案 A → 微调 → 中性色卡）：
+ * union 全量标签一卡一位——中性卡体（surface + 左彩条 + 色名着色，--card-accent
+ * 指向 --tag-N-c）承担浏览导航（整卡 stretched-link 进详情）与改色（surface-2 托盘
+ * 内高饱和色板，pulse 点击脉冲）；末尾虚线幽灵卡承担创建（upsert 语义不变）。
  */
 
 const tags = ref<TagCount[]>([])
@@ -53,12 +53,12 @@ const unionTags = computed<TagCount[]>(() => {
 
 const filter = ref('')
 
-/** 排序：常用（count 降序+名称）/ 名称 / 自定义优先（同组内按常用序）；偏好 localStorage 记忆（密度同款守卫） */
-type SortMode = 'used' | 'name' | 'custom'
+/** 排序：常用（count 降序+名称）/ 名称；偏好 localStorage 记忆（密度同款守卫） */
+type SortMode = 'used' | 'name'
 const sort = ref<SortMode>('used')
 try {
   const saved = localStorage.getItem('en_tool:tag-sort')
-  if (saved === 'used' || saved === 'name' || saved === 'custom') sort.value = saved
+  if (saved === 'used' || saved === 'name') sort.value = saved
 } catch {
   /* 存储不可用（隐私模式等）时用默认常用序 */
 }
@@ -73,17 +73,9 @@ function setSort(mode: SortMode): void {
 }
 
 const sortedTags = computed<TagCount[]>(() => {
-  const base = (a: TagCount, b: TagCount) => b.count - a.count || a.tag.localeCompare(b.tag)
   const list = [...unionTags.value]
   if (sort.value === 'name') return list.sort((a, b) => a.tag.localeCompare(b.tag))
-  if (sort.value === 'custom') {
-    return list.sort((a, b) => {
-      const ca = a.tag in registry.value ? 1 : 0
-      const cb = b.tag in registry.value ? 1 : 0
-      return cb - ca || base(a, b)
-    })
-  }
-  return list.sort(base)
+  return list.sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
 })
 
 const filtered = computed<TagCount[]>(() => {
@@ -92,13 +84,20 @@ const filtered = computed<TagCount[]>(() => {
   return sortedTags.value.filter((t) => t.tag.toLowerCase().includes(q))
 })
 
-const isCustom = (tag: string) => tag in registry.value
 const colorIndex = (tag: string) => tagColorIndex(tag)
+
+/** 卡体强调色（彩条/标签名）指向当前色的文字色令牌；内联注入保持令牌引用 */
+function cardStyle(tag: string, i: number): Record<string, string> {
+  const style: Record<string, string> = {
+    '--card-accent': `var(--tag-${colorIndex(tag)}-c)`,
+  }
+  if (play(i)) style.animationDelay = `calc(var(--stagger-step) * ${i})`
+  return style
+}
 
 // ---------- 入场 stagger（同 NoteList 配方：cap 前携带递增内联 delay，祖先 stagger-arm 门控） ----------
 
 const play = (i: number) => i < STAGGER_CAP
-const delay = (i: number) => ({ animationDelay: `calc(var(--stagger-step) * ${i})` })
 
 // ---------- 卡内点色即改 ----------
 
@@ -182,7 +181,7 @@ async function submitCreate(): Promise<void> {
       <div class="header-tools">
         <div class="seg" role="group" aria-label="排序方式">
           <button
-            v-for="m in ([['custom', '自定义'], ['name', '名称'], ['used', '常用']] as const)"
+            v-for="m in ([['name', '名称'], ['used', '常用']] as const)"
             :key="m[0]"
             type="button"
             class="sort-chip"
@@ -226,8 +225,8 @@ async function submitCreate(): Promise<void> {
           v-for="(t, i) in filtered"
           :key="t.tag"
           class="tag-card"
-          :class="[`tag-pair-${colorIndex(t.tag)}`, { 'card-in': play(i) }]"
-          :style="play(i) ? delay(i) : undefined"
+          :class="{ 'card-in': play(i) }"
+          :style="cardStyle(t.tag, i)"
         >
           <div class="card-head">
             <h3 class="card-name">
@@ -238,13 +237,6 @@ async function submitCreate(): Promise<void> {
             <p class="card-meta">
               <span v-if="t.count === 0" class="card-badge">未使用</span>
               <span v-else class="card-count">{{ t.count }} 条</span>
-              <span
-                v-if="!isCustom(t.tag)"
-                class="card-badge"
-                title="颜色由系统自动分配，点下方色块可自定义"
-              >
-                自动
-              </span>
             </p>
           </div>
           <TagPalette
@@ -406,25 +398,26 @@ async function submitCreate(): Promise<void> {
   color: var(--color-danger);
 }
 
-/* 全染色卡：底色/文字色来自 tokens.css 的 .tag-pair-N 全局应用类（scoped 不设
-   background/color，特异性会压过全局类）；文字色经继承覆盖卡内全部子元素 */
+/* 中性色卡（v1.1 迭代④）：卡体回归 surface + 1px 边框（列表行同族），颜色身份由
+   左彩条（--card-accent 指向 --tag-N-c）与色名着色承担——全染洗底在深色下发闷、
+   浅色致视觉疲劳，退场 */
 .tag-card {
-  --swatch-ring-gap: transparent; /* 选中环缺口透出卡体洗底而非页面底色 */
   position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--card-accent);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
   transition: transform var(--duration-fast) var(--ease-out),
     box-shadow var(--duration-fast) var(--ease-out);
 }
 
-/* hover 与 TagBadge 同策略：叠加 --tag-hover-overlay 强化洗底 + 轻浮起 */
 .tag-card:hover {
   transform: translateY(-1px);
-  background-image: linear-gradient(var(--tag-hover-overlay), var(--tag-hover-overlay));
+  box-shadow: var(--shadow-sm);
 }
 
 /* 两段式卡面：信息行（名称左·元信息右）+ 控制区（托盘色板） */
@@ -443,10 +436,10 @@ async function submitCreate(): Promise<void> {
   min-width: 0;
 }
 
-/* 整卡可点（NoteList stretched-link 同配方）：名称链接伪元素铺满整卡，
-   色板按钮定位提升保持浮在拉伸层之上（DOM 在后 + z 抬升） */
+/* 色名着当前强调色；整卡可点（NoteList stretched-link 同配方）：名称链接伪元素
+   铺满整卡，色板按钮定位提升保持浮在拉伸层之上（DOM 在后 + z 抬升） */
 .card-link {
-  color: inherit;
+  color: var(--card-accent);
   text-decoration: none;
 }
 
@@ -488,7 +481,8 @@ async function submitCreate(): Promise<void> {
   line-height: 1.6;
 }
 
-/* 控制区托盘：surface 底胶囊让色点脱离卡体洗底（对比根除模糊），点距均分铺满 */
+/* 控制区托盘：surface-2 底胶囊在中性卡上形成凹槽层次，饱和色点（.tag-dot-N）其上
+   高辨识；点距均分铺满 */
 .card-palette {
   position: relative;
   z-index: var(--z-rail);
@@ -497,7 +491,8 @@ async function submitCreate(): Promise<void> {
   justify-content: space-between;
   width: 100%;
   padding: 6px 10px;
-  background: var(--color-surface);
+  background: var(--color-surface-2);
+  --swatch-ring-gap: var(--color-surface-2);
   border-radius: var(--radius-full);
 }
 
