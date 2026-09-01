@@ -219,15 +219,17 @@ async function submitCreate(): Promise<void> {
           :class="[`tag-pair-${colorIndex(t.tag)}`, { 'card-in': play(i) }]"
           :style="play(i) ? delay(i) : undefined"
         >
-          <h3 class="card-name">
-            <RouterLink :to="`/tags/${encodeURIComponent(t.tag)}`" class="card-link">
-              {{ t.tag }}
-            </RouterLink>
-          </h3>
-          <p class="card-meta">
-            <span v-if="t.count === 0" class="card-badge">未使用</span>
-            <span v-else class="card-count">{{ t.count }} 条</span>
-          </p>
+          <div class="card-head">
+            <h3 class="card-name">
+              <RouterLink :to="`/tags/${encodeURIComponent(t.tag)}`" class="card-link">
+                {{ t.tag }}
+              </RouterLink>
+            </h3>
+            <p class="card-meta">
+              <span v-if="t.count === 0" class="card-badge">未使用</span>
+              <span v-else class="card-count">{{ t.count }} 条</span>
+            </p>
+          </div>
           <TagPalette
             class="card-palette"
             :model-value="colorIndex(t.tag)"
@@ -409,11 +411,20 @@ async function submitCreate(): Promise<void> {
   background-image: linear-gradient(var(--tag-hover-overlay), var(--tag-hover-overlay));
 }
 
+/* 两段式卡头（迭代⑥恢复③排布）：名称左·元信息右 */
+.card-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
 .card-name {
   margin: 0;
   font-size: var(--text-md);
   font-weight: 600;
   overflow-wrap: anywhere;
+  flex: 1;
+  min-width: 0;
 }
 
 /* 整卡可点（NoteList stretched-link 同配方）：名称链接伪元素铺满整卡，
@@ -444,7 +455,8 @@ async function submitCreate(): Promise<void> {
   margin: 0;
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
+  flex-shrink: 0;
   font-size: var(--text-xs);
 }
 
@@ -462,10 +474,17 @@ async function submitCreate(): Promise<void> {
 }
 
 /* 色板行：色点直接排布于洗底（v1.1 迭代⑤回退方案 A 原设计），pulse 选中环缺口透出洗底 */
+/* 控制区白托盘（迭代③形态）：surface 胶囊让色点脱离卡体洗底，点距均分铺满 */
 .card-palette {
   position: relative;
   z-index: var(--z-rail);
   margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--color-surface);
+  border-radius: var(--radius-full);
 }
 
 /* 幽灵新建卡：虚线占位 → 点击原位展开表单 */
