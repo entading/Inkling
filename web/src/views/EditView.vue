@@ -309,9 +309,12 @@ function positionHint(): void {
   const taRect = ta.getBoundingClientRect()
   const paneRect = pane.getBoundingClientRect()
   const lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 20
+  // 水平钳制：行尾触发时浮层右缘不超出 pane（max-width 300 + pane 自身 padding 余量），
+  // 防窄窗口下溢出产生横向滚动
+  const maxLeft = pane.clientWidth - 320
   hintPos.value = {
     top: taRect.top - paneRect.top + top - ta.scrollTop + lineHeight + 2,
-    left: taRect.left - paneRect.left + left - ta.scrollLeft,
+    left: Math.max(0, Math.min(taRect.left - paneRect.left + left - ta.scrollLeft, maxLeft)),
   }
 }
 
@@ -380,6 +383,9 @@ function insertWikiHint(item: NoteDetail): void {
  * Tab 补全开启=接受当前候选（编辑器惯例），关闭=插入两空格缩进。
  */
 function onSourceKeydown(e: KeyboardEvent): void {
+  // IME 组合中（拼音组字等）：Enter 确认候选 / ↑↓ 选字 / Esc 取消属输入法语义，
+  // 不劫持不关闭浮层（与 CommandPalette 同款守卫）
+  if (e.isComposing || e.keyCode === 229) return
   if (hint.value) {
     const count = hintItems.value.length
     if (e.key === 'ArrowDown' && count) {
