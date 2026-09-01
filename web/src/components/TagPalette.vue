@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ modelValue: number }>()
+withDefaults(defineProps<{ modelValue: number; size?: 'sm' | 'md' }>(), { size: 'md' })
 const emit = defineEmits<{ (e: 'select', color: number): void }>()
 
 const COLORS = [0, 1, 2, 3, 4, 5, 6, 7]
@@ -20,7 +20,7 @@ const COLORS = [0, 1, 2, 3, 4, 5, 6, 7]
     >
       <!-- 色点必须由内层 span 承接 .tag-pair-N：scoped 类特异性（含 [data-v]）压过全局应用类，
            本组件任何 scoped 规则都不得给 dot 设 background/color（M2' 铁律的按钮变体） -->
-      <span class="swatch-dot" :class="`tag-pair-${c}`" />
+      <span class="swatch-dot" :class="[`tag-pair-${c}`, size === 'sm' && 'swatch-dot-sm']" />
     </button>
   </div>
 </template>
@@ -52,8 +52,15 @@ const COLORS = [0, 1, 2, 3, 4, 5, 6, 7]
   box-shadow: inset 0 0 0 1px var(--color-border);
 }
 
+/* 紧凑档：色卡墙卡内使用（三列网格内宽有限） */
+.swatch-dot-sm {
+  width: 14px;
+  height: 14px;
+}
+
+/* 选中环缺口色可被宿主覆盖（全染卡上透出卡体洗底，默认透出页面底色） */
 .swatch.selected {
-  box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-accent);
+  box-shadow: 0 0 0 2px var(--swatch-ring-gap, var(--color-bg)), 0 0 0 4px var(--color-accent);
 }
 
 @media (prefers-reduced-motion: no-preference) {

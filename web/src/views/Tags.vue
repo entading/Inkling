@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { aggregateTags, type TagCount } from '../lib/search'
 import { api } from '../api'
@@ -7,6 +7,14 @@ import { tagRegistryRef, getTagRegistry, applyTagRegistry } from '../lib/tagRegi
 import { tagColorIndex } from '../lib/tagColor'
 import EmptyState from '../components/EmptyState.vue'
 import TagPalette from '../components/TagPalette.vue'
+import { useStaggerArm, STAGGER_CAP } from '../lib/stagger'
+
+/**
+ * 标签页 = 色卡墙（v1.1 体验迭代第 2 轮，方案 A·全染）：
+ * 云标签与自定义颜色区合并为一张画布——每张全染色卡承担颜色身份（tag-pair 洗底）、
+ * 浏览导航（整卡 stretched-link 进详情）与改色（卡内常显色板）三职；末尾虚线
+ * 幽灵卡承担创建（点击原位展开表单，upsert 语义不变）。
+ */
 
 const tags = ref<TagCount[]>([])
 const loading = ref(true)
@@ -14,6 +22,8 @@ const error = ref('')
 
 /** 注册表响应式镜像（main.ts 预载；此处再次调用兜底预载失败后的重试，缓存命中零成本） */
 const registry = computed(() => tagRegistryRef.value)
+
+const staggerArm = useStaggerArm(loading)
 
 onMounted(async () => {
   void getTagRegistry().catch(() => {})
@@ -26,8 +36,8 @@ onMounted(async () => {
   }
 })
 
-/** 云标签 = union(笔记聚合, 注册表)：聚合 count 优先，注册表独有标签补 count=0
- *（「未使用」标记），沿用 count 降序、同数标签升序（0 自然沉底） */
+/** 色卡墙数据 = union(笔记聚合, 注册表)：聚合 count 优先，注册表独有补 count=0，
+ * 沿用 count 降序、同数标签升序 */
 const unionTags = computed<TagCount[]>(() => {
   const merged = new Map<string, number>()
   for (const t of tags.value) merged.set(t.tag, t.count)
@@ -39,81 +49,91 @@ const unionTags = computed<TagCount[]>(() => {
     .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
 })
 
-const registryNames = computed(() => Object.keys(registry.value).sort((a, b) => a.localeCompare(b)))
+// ---------- 页面级筛选（作用于色卡墙） ----------
 
-/** 字号按词条数在 0.85–1.5rem 间线性加权（下限 1：注册表 count=0 引入零计数域，防除零） */
-const maxCount = computed(() => {
-  const counts = tags.value.map((t) => t.count)
-  return Math.max(...counts, 1)
+const filter = ref('')
+const filtered = computed<TagCount[]>(() => {
+  const q = filter.value.trim().toLowerCase()
+  if (!q) return unionTags.value
+  return unionTags.value.filter((t) => t.tag.toLowerCase().includes(q))
 })
 
-function fontSize(count: number): string {
-  const ratio = Math.max(0, count) / maxCount.value
-  return `${(0.85 + ratio * 0.65).toFixed(2)}rem`
+const isCustom = (tag: string) => tag in registry.value
+const colorIndex = (tag: string) => tagColorIndex(tag)
+
+// ---------- 入场 stagger（同 NoteList 配方：cap 前携带递增内联 delay，祖先 stagger-arm 门控） ----------
+
+const play = (i: number) => i < STAGGER_CAP
+const delay = (i: number) => ({ animationDelay: `calc(var(--stagger-step) * ${i})` })
+
+// ---------- 卡内点色即改 ----------
+
+const recoloring = ref(false)
+const recolorError = ref('')
+
+async function recolor(tag: string, color: number): Promise<void> {
+  if (recoloring.value) return
+  recoloring.value = true
+  recolorError.value = ''
+  try {
+    const reg = await api.upsertTag(tag, color)
+    applyTagRegistry(reg)
+  } catch (e) {
+    recolorError.value = `「${tag}」改色失败：${e instanceof Error ? e.message : String(e)}`
+  } finally {
+    recoloring.value = false
+  }
 }
 
-// ---------- ① 新增 / 改色区块（upsert 语义，无 409 分支） ----------
+// ---------- 幽灵卡：创建标签（upsert——已有名称则更新其颜色） ----------
 
+const formOpen = ref(false)
+const pending = ref(false)
 const newName = ref('')
 const newColor = ref(0)
-const creating = ref(false)
-const feedback = ref<{ ok: boolean; text: string } | null>(null)
+const formFeedback = ref<{ ok: boolean; text: string } | null>(null)
+const nameInput = ref<HTMLInputElement | null>(null)
+
+async function openCreate(): Promise<void> {
+  formOpen.value = true
+  await nextTick()
+  nameInput.value?.focus()
+}
+
+function closeCreate(): void {
+  formOpen.value = false
+  newName.value = ''
+  newColor.value = 0
+  formFeedback.value = null
+}
 
 async function submitCreate(): Promise<void> {
-  if (creating.value) return
+  if (pending.value) return
   const tag = newName.value.trim()
-  feedback.value = null
+  formFeedback.value = null
   // 非法输入前端先拦（与服务端校验同规则）；>32 不设 maxlength 硬截断，保留内联报错
   if (!tag) {
-    feedback.value = { ok: false, text: '标签名不能为空白' }
+    formFeedback.value = { ok: false, text: '标签名不能为空白' }
     return
   }
   if (tag.length > 32) {
-    feedback.value = { ok: false, text: '标签名不能超过 32 字符' }
+    formFeedback.value = { ok: false, text: '标签名不能超过 32 字符' }
     return
   }
-  creating.value = true
+  pending.value = true
   try {
-    // 存在性判定在 POST 前对 union 取：笔记携带或注册表已有 = 「已存在，已更新颜色」
-    const existed = unionTags.value.some((t) => t.tag === tag)
     const reg = await api.upsertTag(tag, newColor.value)
     applyTagRegistry(reg)
-    feedback.value = {
-      ok: true,
-      text: existed ? `「${tag}」已存在，已更新颜色` : `已创建标签「${tag}」`,
+    // 成功反馈 = 墙内新卡出现 / 既有卡即时换色；清筛选保证新卡可见
+    filter.value = ''
+    closeCreate()
+  } catch (e) {
+    formFeedback.value = {
+      ok: false,
+      text: `提交失败：${e instanceof Error ? e.message : String(e)}`,
     }
-    newName.value = ''
-  } catch (e) {
-    feedback.value = { ok: false, text: `提交失败：${e instanceof Error ? e.message : String(e)}` }
   } finally {
-    creating.value = false
-  }
-}
-
-// ---------- ③ 自定义颜色行（常显色板，点色即 POST，无展开/收起步骤） ----------
-
-const recoloring = ref(false)
-const recolorErrorFor = ref<string | null>(null)
-const recolorError = ref('')
-
-/** 注册表标签当前词条数（0 = 未使用），用于行内元信息与云标签呼应 */
-function countOf(name: string): number {
-  return unionTags.value.find((t) => t.tag === name)?.count ?? 0
-}
-
-async function recolor(name: string, color: number): Promise<void> {
-  if (recoloring.value) return
-  recoloring.value = true
-  recolorErrorFor.value = null
-  recolorError.value = ''
-  try {
-    const reg = await api.upsertTag(name, color)
-    applyTagRegistry(reg)
-  } catch (e) {
-    recolorErrorFor.value = name
-    recolorError.value = `改色失败：${e instanceof Error ? e.message : String(e)}`
-  } finally {
-    recoloring.value = false
+    pending.value = false
   }
 }
 </script>
@@ -125,77 +145,98 @@ async function recolor(name: string, color: number): Promise<void> {
       <p class="page-meta">{{ unionTags.length }} 个标签</p>
     </header>
 
-    <!-- ① 新增 / 指定颜色区块（v1.1）：upsert——新名称即创建，已有名称则更新颜色 -->
-    <section class="create-block" aria-label="创建或改色标签">
-      <div class="create-row">
-        <input
-          v-model="newName"
-          class="create-input"
-          type="text"
-          placeholder="标签名（不超过 32 字符）"
-          aria-label="标签名"
-          @keydown.enter="submitCreate"
-        />
-        <TagPalette :model-value="newColor" @select="newColor = $event" />
-        <button type="button" class="submit-btn" :disabled="creating" @click="submitCreate">
-          创建标签
-        </button>
-      </div>
-      <p class="create-hint">新名称将创建标签并应用所选颜色；输入已有名称则把该标签更新为所选颜色。</p>
-      <p v-if="feedback" class="feedback" :class="feedback.ok ? 'is-ok' : 'is-error'" role="status">
-        {{ feedback.text }}
-      </p>
-    </section>
-
     <p v-if="error" class="error">加载失败：{{ error }}</p>
     <p v-else-if="loading" class="hint">加载中…</p>
     <template v-else>
-      <!-- ② 云标签 = union(笔记聚合, 注册表)；count=0 挂「未使用」标记 -->
-      <div v-if="unionTags.length" class="tag-cloud">
-        <RouterLink
-          v-for="t in unionTags"
-          :key="t.tag"
-          :to="`/tags/${encodeURIComponent(t.tag)}`"
-          class="cloud-tag"
-          :class="`tag-pair-${tagColorIndex(t.tag)}`"
-          :style="{ fontSize: fontSize(t.count) }"
-          :title="t.count === 0 ? '注册表标签，尚未用于任何词条' : `${t.count} 条词条`"
-        >
-          {{ t.tag }}
-          <span v-if="t.count === 0" class="cloud-unused">未使用</span>
-          <span v-else class="cloud-count">{{ t.count }}</span>
-        </RouterLink>
-      </div>
       <EmptyState
-        v-else
+        v-if="unionTags.length === 0"
         title="暂无标签"
-        description="给词条加上标签，或在上方直接创建标签。"
+        description="给词条加上标签，或点击下方「＋ 新建标签」直接创建。"
       />
-    </template>
 
-    <!-- ③ 自定义颜色：常显色板行，点色即改（详情页 /tags/:tag 亦提供同款取色行） -->
-    <section v-if="!loading && !error && unionTags.length" class="registry-manage" aria-label="自定义颜色标签">
-      <h2 class="section-title">自定义颜色</h2>
-      <p class="section-hint">点击色块立即改色；颜色即时生效并跨设备持久化。</p>
-      <div v-if="registryNames.length" class="registry-list">
-        <div v-for="name in registryNames" :key="name" class="color-row">
-          <span
-            class="row-chip"
-            :class="`tag-pair-${registry[name].color}`"
-            :title="countOf(name) === 0 ? '注册表标签，尚未用于任何词条' : `${countOf(name)} 条词条`"
-          >
-            {{ name }}
-            <span v-if="countOf(name) === 0" class="row-unused">未使用</span>
-            <span v-else class="row-count">{{ countOf(name) }}</span>
-          </span>
-          <TagPalette :model-value="registry[name].color" @select="recolor(name, $event)" />
-          <span v-if="recolorErrorFor === name" class="row-error" role="alert">{{ recolorError }}</span>
-        </div>
+      <!-- 页面级筛选：作用于色卡墙 -->
+      <div v-if="unionTags.length" class="wall-toolbar">
+        <input
+          v-model="filter"
+          class="wall-search"
+          type="text"
+          placeholder="筛选标签…"
+          aria-label="筛选标签"
+        />
       </div>
-      <p v-else class="section-empty">
-        尚无自定义颜色的标签——在上方为标签命名并选色后，可在此随时调整。
-      </p>
-    </section>
+
+      <!-- 色卡墙：union 全量标签。整卡 stretched-link 进详情，卡内色板点色即改 -->
+      <div
+        v-if="unionTags.length || formOpen"
+        class="card-wall"
+        :class="{ 'stagger-arm': staggerArm }"
+      >
+        <p v-if="filtered.length === 0" class="no-match">
+          没有匹配「{{ filter.trim() }}」的标签
+        </p>
+
+        <article
+          v-for="(t, i) in filtered"
+          :key="t.tag"
+          class="tag-card"
+          :class="[`tag-pair-${colorIndex(t.tag)}`, { 'card-in': play(i) }]"
+          :style="play(i) ? delay(i) : undefined"
+        >
+          <h3 class="card-name">
+            <RouterLink :to="`/tags/${encodeURIComponent(t.tag)}`" class="card-link">
+              {{ t.tag }}
+            </RouterLink>
+          </h3>
+          <p class="card-meta">
+            <span v-if="t.count === 0" class="card-badge">未使用</span>
+            <span v-else class="card-count">{{ t.count }} 条</span>
+            <span
+              v-if="!isCustom(t.tag)"
+              class="card-badge"
+              title="颜色由系统自动分配，点下方色块可自定义"
+            >
+              自动
+            </span>
+          </p>
+          <TagPalette
+            class="card-palette"
+            :model-value="colorIndex(t.tag)"
+            size="sm"
+            @select="recolor(t.tag, $event)"
+          />
+        </article>
+
+        <!-- 幽灵新建卡：默认虚线占位，点击原位展开表单 -->
+        <article v-if="!formOpen" class="ghost-card">
+          <button type="button" class="ghost-btn" @click="openCreate">＋ 新建标签</button>
+        </article>
+        <article v-else class="ghost-card is-form">
+          <input
+            ref="nameInput"
+            v-model="newName"
+            class="ghost-input"
+            type="text"
+            placeholder="标签名（不超过 32 字符）"
+            aria-label="标签名"
+            @keydown.enter="submitCreate"
+            @keydown.esc.prevent="closeCreate"
+          />
+          <TagPalette :model-value="newColor" size="sm" @select="newColor = $event" />
+          <p class="ghost-hint">新名称将创建标签；输入已有名称则把该标签更新为所选颜色。</p>
+          <p v-if="formFeedback" class="ghost-feedback" :class="formFeedback.ok ? 'is-ok' : 'is-error'" role="status">
+            {{ formFeedback.text }}
+          </p>
+          <div class="ghost-actions">
+            <button type="button" class="ghost-cancel" @click="closeCreate">取消</button>
+            <button type="button" class="ghost-submit" :disabled="pending" @click="submitCreate">
+              创建标签
+            </button>
+          </div>
+        </article>
+      </div>
+
+      <p v-if="recolorError" class="error" role="alert">{{ recolorError }}</p>
+    </template>
   </div>
 </template>
 
@@ -209,7 +250,7 @@ async function recolor(name: string, color: number): Promise<void> {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-4);
 }
 
 .page-title {
@@ -224,27 +265,176 @@ async function recolor(name: string, color: number): Promise<void> {
   font-size: var(--text-base);
 }
 
-/* ① 新增 / 改色区块：卡片容器，行内排布（移动端换行） */
-.create-block {
-  padding: var(--space-4);
-  margin-bottom: var(--space-6);
+.hint,
+.error {
+  color: var(--color-text-secondary);
+}
+
+.error {
+  color: var(--color-danger);
+}
+
+.wall-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: var(--space-4);
+}
+
+.wall-search {
+  width: 100%;
+  max-width: 320px;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  color: var(--color-text);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+  transition: border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
 }
 
-.create-row {
+.wall-search::placeholder {
+  color: var(--color-text-secondary);
+}
+
+.wall-search:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.card-wall {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+/* 全染色卡：底色/文字色来自 tokens.css 的 .tag-pair-N 全局应用类（scoped 不设
+   background/color，特异性会压过全局类）；文字色经继承覆盖卡内全部子元素 */
+.tag-card {
+  --swatch-ring-gap: transparent; /* 选中环缺口透出卡体洗底而非页面底色 */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+/* hover 与 TagBadge 同策略：叠加 --tag-hover-overlay 强化洗底 + 轻浮起 */
+.tag-card:hover {
+  transform: translateY(-1px);
+  background-image: linear-gradient(var(--tag-hover-overlay), var(--tag-hover-overlay));
+}
+
+.card-name {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* 整卡可点（NoteList stretched-link 同配方）：名称链接伪元素铺满整卡，
+   色板按钮定位提升保持浮在拉伸层之上（DOM 在后 + z 抬升） */
+.card-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.card-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+}
+
+.card-link:focus-visible {
+  outline: none;
+}
+
+.card-link:focus-visible::after {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.card-meta {
+  margin: 0;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  font-size: var(--text-xs);
 }
 
-.create-input {
-  flex: 1;
-  min-width: 200px;
+.card-count {
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+
+.card-badge {
+  padding: 0 8px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-full);
+  opacity: 0.8;
+  line-height: 1.6;
+}
+
+.card-palette {
+  position: relative;
+  z-index: var(--z-rail);
+  margin-top: auto;
+}
+
+/* 幽灵新建卡：虚线占位 → 点击原位展开表单 */
+.ghost-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  min-height: 104px;
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.ghost-card:hover {
+  border-color: var(--color-accent);
+}
+
+.ghost-btn {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.ghost-card:hover .ghost-btn {
+  color: var(--color-accent);
+}
+
+.ghost-card.is-form {
+  align-items: stretch;
+  background: var(--color-surface);
+  border-style: solid;
+}
+
+.ghost-input {
+  width: 100%;
   padding: var(--space-2) var(--space-3);
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   font-family: inherit;
   color: var(--color-text);
   background: var(--color-bg);
@@ -254,19 +444,60 @@ async function recolor(name: string, color: number): Promise<void> {
     box-shadow var(--duration-fast) var(--ease-out);
 }
 
-.create-input::placeholder {
+.ghost-input::placeholder {
   color: var(--color-text-secondary);
 }
 
-.create-input:focus {
+.ghost-input:focus {
   outline: none;
   border-color: var(--color-accent);
   box-shadow: var(--focus-ring);
 }
 
-/* 提交按钮沿用 .empty-clear 同族语言：描边，hover 反转为实底 */
-.submit-btn {
-  padding: var(--space-2) var(--space-4);
+.ghost-hint {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.ghost-feedback {
+  margin: 0;
+  font-size: var(--text-xs);
+}
+
+.ghost-feedback.is-ok {
+  color: var(--color-accent);
+}
+
+.ghost-feedback.is-error {
+  color: var(--color-danger);
+}
+
+.ghost-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.ghost-cancel {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.ghost-cancel:hover {
+  color: var(--color-text);
+}
+
+/* 提交按钮沿用描边反转语言（.empty-clear/.submit-btn 同族） */
+.ghost-submit {
+  padding: var(--space-1) var(--space-3);
   font-size: var(--text-sm);
   font-family: inherit;
   color: var(--color-accent);
@@ -279,150 +510,23 @@ async function recolor(name: string, color: number): Promise<void> {
     transform var(--duration-fast) var(--ease-out);
 }
 
-.submit-btn:hover {
+.ghost-submit:hover {
   background: var(--color-accent);
   color: var(--color-on-accent);
 }
 
-.submit-btn:disabled {
+.ghost-submit:disabled {
   opacity: 0.6;
   cursor: default;
 }
 
-.create-hint {
-  margin: var(--space-2) 0 0;
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-}
-
-.feedback {
-  margin: var(--space-3) 0 0;
-  font-size: var(--text-sm);
-}
-
-.feedback.is-ok {
-  color: var(--color-accent);
-}
-
-.feedback.is-error {
-  color: var(--color-danger);
-}
-
-.tag-cloud {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-2) var(--space-3);
-}
-
-/* 底色/文字色由 tokens.css 的 .tag-pair-N 提供（注册表优先，hash 回落，与 TagBadge 同源） */
-.cloud-tag {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
-  padding: 2px 12px;
-  border-radius: var(--radius-full);
-  line-height: 1.8;
-  text-decoration: none;
-  transition: background-color var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out);
-}
-
-/* hover 与 TagBadge 同策略：叠加 --tag-hover-overlay 强化，不动文字色 */
-.cloud-tag:hover {
-  background-image: linear-gradient(var(--tag-hover-overlay), var(--tag-hover-overlay));
-}
-
-.cloud-count {
-  font-size: 0.7em;
-  opacity: 0.7;
-}
-
-/* 注册表独有标签（count=0）的视觉标记：描边小徽标，继承当前标签色 */
-.cloud-unused {
-  font-size: 0.7em;
-  padding: 0 6px;
-  border: 1px solid currentColor;
-  border-radius: var(--radius-full);
-  opacity: 0.75;
-  line-height: 1.5;
-}
-
-/* ③ 注册表标签改色区块 */
-.registry-manage {
-  margin-top: var(--space-7);
-  padding-top: var(--space-5);
-  border-top: 1px solid var(--color-border);
-}
-
-.section-title {
-  font-size: var(--text-lg);
-  font-weight: 600;
-  margin: 0 0 var(--space-1);
-}
-
-.section-hint {
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  margin: 0 0 var(--space-4);
-}
-
-.registry-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-/* 常显色板行：chip（当前色）+ 色板同行铺开，点色即改，无展开/收起步骤 */
-.color-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-3);
-}
-
-/* 行首 chip：底色/文字色由 .tag-pair-N 提供，scoped 不设 background/color */
-.row-chip {
-  padding: 3px 14px;
-  font-size: var(--text-sm);
-  border-radius: var(--radius-full);
-  min-width: 88px;
-  text-align: center;
-}
-
-.row-count {
-  font-size: 0.7em;
-  opacity: 0.7;
-  margin-left: 4px;
-}
-
-.row-unused {
-  font-size: 0.7em;
-  padding: 0 6px;
-  margin-left: 4px;
-  border: 1px solid currentColor;
-  border-radius: var(--radius-full);
-  opacity: 0.75;
-}
-
-.row-error {
-  font-size: var(--text-sm);
-  color: var(--color-danger);
-}
-
-.section-empty {
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
+.no-match {
+  grid-column: 1 / -1;
   margin: 0;
-}
-
-.hint,
-.error {
+  padding: var(--space-4);
   color: var(--color-text-secondary);
-}
-
-.error {
-  color: var(--color-danger);
+  font-size: var(--text-sm);
+  text-align: center;
 }
 
 @media (max-width: 767px) {
@@ -431,12 +535,33 @@ async function recolor(name: string, color: number): Promise<void> {
     gap: var(--space-1);
     align-items: flex-start;
   }
+
+  .wall-toolbar {
+    justify-content: stretch;
+  }
+
+  .wall-search {
+    max-width: none;
+  }
 }
 
-/* 按压反馈（§6）：新增动画统一包在 no-preference 内 */
+/* 按压反馈与入场 stagger（§6）：新增动画统一包在 no-preference 内 */
 @media (prefers-reduced-motion: no-preference) {
-  .submit-btn:active {
+  .ghost-btn:active,
+  .ghost-submit:active,
+  .ghost-cancel:active {
     transform: scale(0.98);
+  }
+
+  .stagger-arm .card-in {
+    animation: card-in var(--duration-slow) var(--ease-out) backwards;
+  }
+
+  @keyframes card-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
   }
 }
 </style>
