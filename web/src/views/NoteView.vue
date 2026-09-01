@@ -2,9 +2,9 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import TagBadge from '../components/TagBadge.vue'
-import MarkdownViewer from '../components/MarkdownViewer.vue'
+import MarkdownViewer, { type TocItem } from '../components/MarkdownViewer.vue'
 import Skeleton from '../components/Skeleton.vue'
-import { api, type Board, type NoteDetailRaw } from '../api'
+import { api, type Board, type NoteDetailRaw, type NoteMeta } from '../api'
 import { getBacklinks, stripCodeText, type Backlink } from '../lib/backlinks'
 import { isLegalWikiText, parseWikiTarget, setLinkIndex, WIKI_LINK_RE } from '../lib/markdown'
 import { BOARD_LABELS, getSearchIndex, invalidateSearchIndex } from '../lib/search'
@@ -138,8 +138,30 @@ async function load() {
   brokenBannerDismissed.value = false
   deleteError.value = ''
   confirmingDelete.value = false
+  // M4'：目录/进度/上下篇随词条切换重置
+  toc.value = []
+  activeTocId.value = null
+  progress.value = 0
+  prevNote.value = null
+  nextNote.value = null
   try {
-    note.value = await api.note(board, slug)
+    // 上下篇列表与词条并行拉取（服务端已按板块规则排序，板块页同款语义）
+    const [detail] = await Promise.all([
+      api.note(board, slug),
+      api
+        .notes(board)
+        .then((list) => {
+          // 竞态守卫同反向引用：resolve 时已切走词条则丢弃
+          if (route.params.board !== board || route.params.slug !== slug) return
+          const idx = list.findIndex((n) => n.slug === slug)
+          prevNote.value = idx > 0 ? list[idx - 1] : null
+          nextNote.value = idx >= 0 && idx < list.length - 1 ? list[idx + 1] : null
+        })
+        .catch(() => {
+          /* 列表拉取失败：上下篇整块隐藏，不影响阅读 */
+        }),
+    ])
+    note.value = detail
     // 失效链接扫描在链接索引就绪后进行，不阻塞正文渲染
     void refreshMissingLinks()
     // 反向引用并行加载，不阻塞正文；解析完成时若已切走词条则丢弃结果
@@ -152,6 +174,8 @@ async function load() {
       .catch(() => {
         backlinks.value = []
       })
+    // 正文渲染完成后同步一次进度与目录高亮（后续随滚动更新）
+    void nextTick(updateReadingState)
   } catch (e) {
     note.value = null
     error.value = e instanceof Error ? e.message : String(e)
@@ -162,6 +186,127 @@ async function load() {
 
 onMounted(load)
 watch(() => route.params, load)
+
+// ---------- 阅读进度条 + TOC scrollspy（§8，M4'）：rAF 节流共用一个滚动监听 ----------
+
+const progress = ref(0)
+
+const toc = ref<TocItem[]>([])
+const activeTocId = ref<string | null>(null)
+
+/** 当前节判定阈值：视口顶部以下 120px 内的最后一个标题（≈越过页首一屏标题行的高度） */
+const TOC_ACTIVE_OFFSET = 120
+
+function onToc(items: TocItem[]): void {
+  toc.value = items
+  void nextTick(updateReadingState)
+}
+
+function updateReadingState(): void {
+  const doc = document.documentElement
+  const max = doc.scrollHeight - window.innerHeight
+  progress.value = max > 0 ? Math.min(100, Math.max(0, (window.scrollY / max) * 100)) : 0
+  updateScrollSpy()
+}
+
+function updateScrollSpy(): void {
+  if (toc.value.length === 0) {
+    activeTocId.value = null
+    return
+  }
+  const doc = document.documentElement
+  // 触底兜底：末节往往不足以滚过判定阈值，触底直接高亮最后一节
+  if (window.innerHeight + window.scrollY >= doc.scrollHeight - 4) {
+    activeTocId.value = toc.value[toc.value.length - 1].id
+    return
+  }
+  let current = toc.value[0].id
+  for (const item of toc.value) {
+    const el = document.getElementById(item.id)
+    if (!el) break
+    if (el.getBoundingClientRect().top > TOC_ACTIVE_OFFSET) break
+    current = item.id
+  }
+  activeTocId.value = current
+}
+
+/** 点击目录：scrollIntoView 平滑滚动（reduced-motion 用瞬时跳转），不做 URL hash 同步 */
+function scrollToToc(id: string): void {
+  const el = document.getElementById(id)
+  if (!el) return
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+}
+
+let scrollRaf = 0
+
+function onWinScroll(): void {
+  if (scrollRaf) return
+  scrollRaf = window.requestAnimationFrame(() => {
+    scrollRaf = 0
+    updateReadingState()
+  })
+}
+
+// ---------- 上下篇（§8，M4'）：页脚链接与 J/K 共用同一跳转 ----------
+
+const prevNote = ref<NoteMeta | null>(null)
+const nextNote = ref<NoteMeta | null>(null)
+
+function goSibling(delta: 1 | -1): void {
+  const target = delta === 1 ? nextNote.value : prevNote.value
+  if (!target || !note.value) return
+  void router.push(`/v/${note.value.board}/${encodeURIComponent(target.slug)}`)
+}
+
+// ---------- 阅读页键盘快捷键（§8，M4'）：E 编辑 / Esc 返回 / J·K 上下篇 ----------
+
+function onPageKeydown(e: KeyboardEvent): void {
+  if (e.defaultPrevented) return
+  // 带修饰键的组合（Ctrl+K 面板、Ctrl+S 保存等）一律不劫持
+  if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return
+  // 文本输入焦点时单键属于输入内容
+  const t = e.target
+  if (
+    t instanceof HTMLElement &&
+    (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
+  ) {
+    return
+  }
+  // Esc：删除确认态先取消确认；面板打开时其 document capture 段已 stopPropagation，
+  // 本监听收不到事件，优先级天然成立
+  if (e.key === 'Escape') {
+    if (confirmingDelete.value) {
+      confirmingDelete.value = false
+    } else if (note.value) {
+      void router.push(`/${note.value.board}`)
+    }
+    return
+  }
+  if (loading.value || !note.value) return
+  const k = e.key.toLowerCase()
+  if (k === 'e') {
+    e.preventDefault()
+    void router.push(`/v/${note.value.board}/${encodeURIComponent(note.value.slug)}/edit`)
+  } else if (k === 'j') {
+    e.preventDefault()
+    goSibling(1)
+  } else if (k === 'k') {
+    e.preventDefault()
+    goSibling(-1)
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('scroll', onWinScroll, { passive: true })
+  window.addEventListener('keydown', onPageKeydown)
+})
+
+onBeforeUnmount(() => {
+  window.cancelAnimationFrame(scrollRaf)
+  window.removeEventListener('scroll', onWinScroll)
+  window.removeEventListener('keydown', onPageKeydown)
+})
 
 // ---------- 删除词条（M7）：内联两态确认，非模态弹窗 ----------
 
@@ -270,10 +415,14 @@ async function refreshMissingLinks(): Promise<void> {
 
 <template>
   <div class="note-page">
-    <p v-if="error" class="error">
-      <strong>词条不存在或加载失败</strong>
-      <span>{{ error }}</span>
-    </p>
+    <!-- 阅读进度条（§8）：fixed 顶部 2px，仅阅读页挂载；宽度由滚动进度驱动，不可滚动时为 0 不显示 -->
+    <div v-if="note" class="read-progress" :style="{ width: `${progress}%` }" aria-hidden="true" />
+
+    <div class="note-main">
+      <p v-if="error" class="error">
+        <strong>词条不存在或加载失败</strong>
+        <span>{{ error }}</span>
+      </p>
     <div v-else-if="loading" class="note-skeleton" aria-hidden="true">
       <Skeleton class="sk-title" />
       <Skeleton class="sk-ipa" />
@@ -350,7 +499,7 @@ async function refreshMissingLinks(): Promise<void> {
         <button type="button" class="banner-close" aria-label="关闭提示" @click="brokenBannerDismissed = true">×</button>
       </p>
 
-      <MarkdownViewer :body="note.body" />
+      <MarkdownViewer :body="note.body" @toc="onToc" />
 
       <section v-if="backlinks.length > 0" class="backlinks" aria-label="反向引用">
         <h2 class="backlinks-title">反向引用</h2>
@@ -363,7 +512,49 @@ async function refreshMissingLinks(): Promise<void> {
           </li>
         </ul>
       </section>
-    </article>
+
+      <!-- 上下篇（§8）：与板块页同款排序语义；首/尾篇对应侧留空占位保持对称 -->
+      <nav v-if="prevNote || nextNote" class="note-pager" aria-label="上下篇">
+        <div class="pager-cell">
+          <RouterLink
+            v-if="prevNote"
+            :to="`/v/${note.board}/${encodeURIComponent(prevNote.slug)}`"
+            class="pager-link"
+          >
+            <span class="pager-direction">← 上篇</span>
+            <span class="pager-title">{{ prevNote.title }}</span>
+          </RouterLink>
+        </div>
+        <div class="pager-cell pager-cell-right">
+          <RouterLink
+            v-if="nextNote"
+            :to="`/v/${note.board}/${encodeURIComponent(nextNote.slug)}`"
+            class="pager-link"
+          >
+            <span class="pager-direction">下篇 →</span>
+            <span class="pager-title">{{ nextNote.title }}</span>
+          </RouterLink>
+        </div>
+      </nav>
+      </article>
+    </div>
+
+    <!-- TOC 目录（§8）：≥1280px 视口落第 3 列（不占正文文档流），sticky 跟随；无 h2/h3 整块隐藏 -->
+    <aside v-if="toc.length > 0" class="toc" aria-label="目录">
+      <p class="toc-title">目录</p>
+      <ul class="toc-list">
+        <li
+          v-for="item in toc"
+          :key="item.id"
+          class="toc-item"
+          :class="[item.level === 3 ? 'toc-lv3' : 'toc-lv2', { active: item.id === activeTocId }]"
+        >
+          <button type="button" class="toc-link" @click="scrollToToc(item.id)">
+            {{ item.text }}
+          </button>
+        </li>
+      </ul>
+    </aside>
 
     <!-- 选中朗读浮动工具条：Teleport 到 body 避免 .note 的 overflow/层叠上下文裁剪 -->
     <Teleport to="body">
@@ -392,6 +583,160 @@ async function refreshMissingLinks(): Promise<void> {
 .note-page {
   max-width: var(--content-max-width);
   margin: 0 auto;
+}
+
+/* 阅读进度条（§8）：fixed 顶部 2px，仅阅读页挂载；宽度由滚动进度驱动 */
+.read-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  z-index: var(--z-rail);
+  background: var(--color-accent);
+  pointer-events: none;
+}
+
+/* TOC 目录（§8）：默认隐藏；≥1280px 视口下 .note-page 切三列 grid，目录落第 3 列
+   （不占正文文档流）。对称负 margin 伸入 .content 左右 padding 使列宽=边距宽，
+   TOC 物理上不可能溢出视口；正文列恒 720px 居中，出现/消失零正文位移零横滚 */
+.toc {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .note-page {
+    max-width: none;
+    margin: 0 calc(-1 * var(--space-7));
+    display: grid;
+    grid-template-columns: 1fr minmax(0, var(--content-max-width)) 1fr;
+    align-items: start;
+  }
+
+  .note-main {
+    grid-column: 2;
+    min-width: 0;
+  }
+
+  .toc {
+    display: block;
+    grid-column: 3;
+    grid-row: 1;
+    position: sticky;
+    top: var(--space-6);
+    width: min(100%, 240px);
+    max-height: calc(100vh - var(--space-7) * 2);
+    overflow-y: auto;
+    padding-left: var(--space-4);
+  }
+}
+
+.toc-title {
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-left: 1px solid var(--color-border);
+}
+
+.toc-item {
+  border-left: 2px solid transparent;
+  margin-left: -1px; /* 盖住 ul 的 1px 边线，高亮条与边线无缝衔接 */
+}
+
+.toc-lv3 .toc-link {
+  padding-left: var(--space-5);
+}
+
+.toc-link {
+  display: block;
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  text-align: left;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toc-link:hover {
+  color: var(--color-text);
+}
+
+/* scrollspy 当前节：accent 字色 + 柔和底 + 左侧高亮条 */
+.toc-item.active {
+  border-left-color: var(--color-accent);
+}
+
+.toc-item.active .toc-link {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+/* 上下篇页脚（§8）：两列对称网格，隐藏侧留空占位 */
+.note-pager {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.pager-cell {
+  min-width: 0;
+}
+
+.pager-cell-right {
+  text-align: right;
+}
+
+.pager-link {
+  display: inline-block;
+  max-width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.pager-link:hover {
+  border-color: var(--color-accent);
+}
+
+.pager-direction {
+  display: block;
+  margin-bottom: 2px;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.pager-title {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pager-link:hover .pager-title {
+  color: var(--color-accent);
 }
 
 .error {
@@ -454,8 +799,20 @@ async function refreshMissingLinks(): Promise<void> {
   .edit-link:active,
   .delete-btn:active,
   .sel-bar-btn:active,
-  .banner-close:active {
+  .banner-close:active,
+  .pager-link:active,
+  .toc-link:active {
     transform: scale(0.98);
+  }
+
+  /* scrollspy 高亮过渡（§8）：默认静态，显式允许才动 */
+  .toc-item {
+    transition: border-color var(--duration-fast) var(--ease-out);
+  }
+
+  .toc-link {
+    transition: color var(--duration-fast) var(--ease-out),
+      background-color var(--duration-fast) var(--ease-out);
   }
 }
 

@@ -1,3 +1,20 @@
+<script lang="ts">
+/**
+ * 渲染后 DOM 后处理（M4'）：TOC 扫描产物类型 + 代码块复制按钮注入用的内联 SVG。
+ * 注入 DOM 无法使用 Vue 组件，SVG path 数据与 Icon.vue 的 copy/check 注册项一致（改动须两处同步）。
+ */
+export interface TocItem {
+  id: string
+  level: 2 | 3
+  text: string
+}
+
+const COPY_ICON_SVG =
+  '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2"/></svg>'
+const CHECK_ICON_SVG =
+  '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>'
+</script>
+
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -10,7 +27,12 @@ const props = withDefaults(defineProps<{ body: string; interactive?: boolean }>(
   interactive: true,
 })
 
+/** TOC 目录数据（渲染后扫描 .note-body h2/h3 生成，文本取 textContent）；无 h2/h3 时为空数组 */
+const emit = defineEmits<{ toc: [items: TocItem[]] }>()
+
 const router = useRouter()
+
+const bodyEl = ref<HTMLElement | null>(null)
 
 /** 链接索引就绪后 +1，触发 html 重新计算（未就绪时 [[...]] 按存在渲染，就绪后修正为缺失样式） */
 const linkVersion = ref(0)
@@ -18,21 +40,6 @@ const linkVersion = ref(0)
 const html = computed(() => {
   void linkVersion.value
   return render(props.body)
-})
-
-onMounted(() => {
-  // 拉取/刷新链接存在性索引后重渲染（本地应用闪变亚秒级，可接受）
-  void getSearchIndex()
-    .then((notes) => {
-      setLinkIndex(notes)
-      linkVersion.value++
-    })
-    .catch(() => {
-      /* 索引拉取失败：保持按存在渲染，不影响阅读 */
-    })
-  window.addEventListener('scroll', onScrollHidePreview, true)
-  // 窗口缩放同 scroll：链接矩形失效，预览卡停在过期坐标（M6 复检 1 的 sel-bar 同款问题）
-  window.addEventListener('resize', onScrollHidePreview)
 })
 
 // ---------- wiki 链接跳转（click 与 Enter 键盘委托共用） ----------
@@ -51,14 +58,93 @@ function navigateWiki(el: Element): void {
   )
 }
 
-/** 事件委托：wiki 链接 SPA 跳转。普通 md 链接不受影响 */
+/** 事件委托：wiki 链接 SPA 跳转；代码块复制按钮（复制是阅读动作，编辑页预览同样可用） */
 function onBodyClick(e: MouseEvent): void {
+  const copyBtn = (e.target as HTMLElement | null)?.closest('button.code-copy-btn')
+  if (copyBtn instanceof HTMLButtonElement) {
+    e.preventDefault()
+    void copyCode(copyBtn)
+    return
+  }
   if (!props.interactive) return
   const el = (e.target as HTMLElement | null)?.closest('a.wiki-link')
   if (!el) return
   e.preventDefault()
   navigateWiki(el)
 }
+
+// ---------- 渲染后 DOM 后处理（M4'）：TOC id 注入 + 代码块复制按钮 ----------
+
+/** 复制按钮的 1.5s 反馈还原定时器（按钮随 v-html 重建，WeakMap 挂节点自动回收） */
+const copiedTimers = new WeakMap<HTMLButtonElement, number>()
+
+async function copyCode(btn: HTMLButtonElement): Promise<void> {
+  const pre = btn.closest('pre')
+  if (!pre || btn.classList.contains('copied') || btn.classList.contains('copy-error')) return
+  const text = (pre.querySelector('code')?.textContent ?? pre.textContent ?? '').replace(/\n+$/, '')
+  let ok = false
+  try {
+    await navigator.clipboard.writeText(text)
+    ok = true
+  } catch {
+    /* 剪贴板不可用（非安全上下文/权限拒绝）：走 1.5s 错误反馈 */
+  }
+  btn.classList.add(ok ? 'copied' : 'copy-error')
+  if (ok) btn.innerHTML = CHECK_ICON_SVG
+  window.clearTimeout(copiedTimers.get(btn))
+  copiedTimers.set(
+    btn,
+    window.setTimeout(() => {
+      btn.classList.remove('copied', 'copy-error')
+      btn.innerHTML = COPY_ICON_SVG
+    }, 1500),
+  )
+}
+
+/**
+ * 每次 html 变化渲染完成后执行（watch flush: 'post'，DOM 已就地更新）：
+ * 1) 按文档序扫描 h2/h3，注入渲染确定性唯一 id 并 emit TOC 数据（不改 markdown.ts 渲染契约）；
+ * 2) 为每个 pre 注入右上角复制按钮（点击走根节点 click 委托，重渲染随 DOM 重建不丢事件）。
+ */
+function processAfterRender(): void {
+  const root = bodyEl.value
+  if (!root) return
+  const items: TocItem[] = []
+  root.querySelectorAll('h2, h3').forEach((h, i) => {
+    const id = `toc-sec-${i}`
+    h.id = id
+    items.push({ id, level: h.tagName === 'H2' ? 2 : 3, text: (h.textContent ?? '').trim() })
+  })
+  emit('toc', items)
+  root.querySelectorAll('pre').forEach((pre) => {
+    if (pre.querySelector('.code-copy-btn')) return
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'code-copy-btn'
+    btn.setAttribute('aria-label', '复制代码')
+    btn.title = '复制代码'
+    btn.innerHTML = COPY_ICON_SVG
+    pre.appendChild(btn)
+  })
+}
+
+onMounted(() => {
+  processAfterRender()
+  // 拉取/刷新链接存在性索引后重渲染（本地应用闪变亚秒级，可接受）
+  void getSearchIndex()
+    .then((notes) => {
+      setLinkIndex(notes)
+      linkVersion.value++
+    })
+    .catch(() => {
+      /* 索引拉取失败：保持按存在渲染，不影响阅读 */
+    })
+  window.addEventListener('scroll', onScrollHidePreview, true)
+  // 窗口缩放同 scroll：链接矩形失效，预览卡停在过期坐标（M6 复检 1 的 sel-bar 同款问题）
+  window.addEventListener('resize', onScrollHidePreview)
+})
+
+watch(html, processAfterRender, { flush: 'post' })
 
 /** 键盘可达（M7）：wiki 链接无 href 但有 tabindex/role，Enter 触发与点击同款跳转 */
 function onBodyKeydown(e: KeyboardEvent): void {
@@ -239,6 +325,7 @@ watch(() => props.body, hidePreview)
 
 <template>
   <div
+    ref="bodyEl"
     class="note-body"
     @click="onBodyClick"
     @keydown.enter="onBodyKeydown"
@@ -301,6 +388,8 @@ watch(() => props.body, hidePreview)
   margin: 1.5em 0 0.5em;
   text-wrap: balance;
   letter-spacing: normal;
+  /* TOC/锚点跳转时给标题留出视口上缘呼吸位（M2 scroll-margin 同机制） */
+  scroll-margin-top: var(--space-6);
 }
 
 /* h3 与正文同字号、靠加粗分层（阶梯内无 1.05 的档位，映射见实施记录） */
@@ -308,6 +397,7 @@ watch(() => props.body, hidePreview)
   font-size: var(--text-body);
   text-wrap: balance;
   letter-spacing: normal;
+  scroll-margin-top: var(--space-6);
 }
 
 .note-body :deep(p) {
@@ -352,12 +442,56 @@ watch(() => props.body, hidePreview)
 }
 
 .note-body :deep(pre) {
+  position: relative; /* 复制按钮（M4'）的定位锚点 */
   font-family: var(--font-mono);
   padding: var(--space-4);
   border-radius: var(--radius-md);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   overflow-x: auto;
+}
+
+/* 代码块复制按钮（M4'）：注入 DOM 的元素，靠 :deep 命中；常显低透明度保证触屏可用 */
+.note-body :deep(.code-copy-btn) {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: color var(--duration-fast) var(--ease-out),
+    opacity var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.note-body :deep(.code-copy-btn:hover),
+.note-body :deep(.code-copy-btn:focus-visible) {
+  opacity: 1;
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.note-body :deep(.code-copy-btn.copied) {
+  opacity: 1;
+  color: var(--color-accent);
+}
+
+.note-body :deep(.code-copy-btn.copy-error) {
+  opacity: 1;
+  color: var(--color-danger);
+}
+
+.note-body :deep(.code-copy-btn svg) {
+  pointer-events: none; /* 点击目标稳定落在 button 上，closest 委托不受子节点影响 */
 }
 
 .note-body :deep(pre code) {
@@ -504,6 +638,13 @@ watch(() => props.body, hidePreview)
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* 按压反馈（§6 铁律）：新增按压动效连同守卫一起声明，默认静态 */
+@media (prefers-reduced-motion: no-preference) {
+  .note-body :deep(.code-copy-btn:active) {
+    transform: scale(0.98);
+  }
 }
 
 @media (max-width: 767px) {
