@@ -444,12 +444,11 @@ watch(() => route.query, syncFromRoute)
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  margin-left: auto;
 }
 
 .fchip {
-  padding: 3px 12px;
-  font-size: var(--text-xs);
+  padding: 4px 13px;
+  font-size: var(--text-sm);
   font-family: inherit;
   color: var(--color-text-secondary);
   background: var(--color-surface);
@@ -465,6 +464,35 @@ watch(() => route.query, syncFromRoute)
 .fchip:hover {
   color: var(--color-accent);
   border-color: var(--color-accent);
+}
+
+/* 排序/密度分段控件：灰底轨道 + 活动段白底浮起（视图控制语言，与标签筛选项区分） */
+.seg {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--color-surface-2);
+  border-radius: var(--radius-full);
+}
+
+.seg .fchip {
+  padding: 4px 14px;
+  background: transparent;
+  border-color: transparent;
+}
+
+.seg .fchip:hover {
+  color: var(--color-text);
+  border-color: transparent;
+  background: transparent;
+}
+
+.seg .fchip.active {
+  color: var(--color-accent);
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-sm);
 }
 
 .fchip.active {
