@@ -174,3 +174,19 @@
 - [x] **复检自身残留清理**：临时词条 ×2（m4-toc-check、m4-review-check）文件系统建删、零 git 痕迹；孤儿草稿 `en_tool:draft:vocab:…m4-review-check` 清理（复检经 UI 建词条后停留编辑页 >3s 触发 v1 既有草稿自动暂存，属预期行为非缺陷）；两 origin localStorage 仅余 `en_tool:theme=system`；临时验证代码零落盘。
 - [备注] **NewNote slug 观感**（非缺陷，观察项）：标题与手填 slug 同时存在时自动生成的 slug 前缀与手填值拼接（复检实测得到 `m4-复检临时词条m4-review-check`）——v1 既有 NewNote 行为，M4' 未触碰 NewNote，不在本里程碑处置范围。
 - [备注] **浏览器后退时面板保持打开**：面板挂 App 层不受路由变化影响，仅动作/Esc/遮罩/Ctrl+K 关闭——模态语义的可接受行为，如需「路由变化自动关」属 M5'+ 增强。
+
+## 审查（第三轮，2026-09-01，独立审查会话）
+
+对已提交状态（HEAD = 050de0b）独立复验，**结论：通过验收，零代码缺陷**。本轮审查环境 rAF 健康，全部键盘链路以合成事件实测通过：
+
+- [x] **代码核对**：CommandPalette（document capture 段 stopPropagation 独占 + isComposing 放行 / setPreference 复用 / z-float / dialog+listbox aria 全套）、App.vue（窗口层 Ctrl/Cmd+K）、NoteView（`min-width: 1280px` 字面量三列 grid `1fr / minmax(0, var(--content-max-width)) / 1fr`、goSibling ±1 供 J/K 与页脚共用、Esc 优先级链）、MarkdownViewer（`toc-sec-N` 确定性 id、`closest('.code-copy-btn')` 容器委托、copied/copy-error 定时器管理），逐项与设计文档 §7 §8 及任务约束一致。
+- [x] **独立实测（browser-use，rAF 健康环境）**：
+  - **面板**：合成 Ctrl+K 打开（13 选项=8 动作+5 最近、焦点自动入框、body overflow 锁滚、aria-activedescendant 就位）→ 输入 abandon 跨板块 2 命中 → ↓↓+Enter 实际跳转 `/v/vocab/abandon` → 再开面板 Esc 关闭且**停留阅读页**（Esc 优先级实证）→ 「切换深色主题」动作点击后 data-theme=dark + localStorage=dark + 面板自动关闭；
+  - **快捷键**：E→编辑页、J→下篇、Esc→板块页；板块页搜索框聚焦时按 e 零跳转（输入守卫实证）；
+  - **上下篇**：m4-review-check 的 prev=boost / next=perseverance 与服务端字母序一致；
+  - **进度条**：0px / 632px(=50.0%) / 1264px(≈100%) 三点精确（scrollTo+合成 scroll 事件对策程序化滚动零投递 quirk），scrollspy 触底兜底命中末节；
+  - **TOC**：临时长文（文件系统建删）7 项 id 唯一、正文卡恒 720px 零位移零横滚、点击滚动生效（短文钳制 maxScroll 属正常）、移动端 display:none；
+  - **复制**：writeText 捕获桩点击实测——copied 类 + 载荷 44 字符与 pre 文本逐字节一致；
+  - **移动端**：TOC 隐藏/进度条/上下篇 ×2/复制按钮/零横滚五项全过。
+- [x] **构建与隔离**：`npm run build` JS 产物 hash（index-BAfPZ5Um.js）与复检 preview 记录一致；`a294773..HEAD` 对 server/、notes/、lib 五件套、index.html、Icon/Skeleton/NoteList/SearchPanel/EditView/Settings 零改动；组件散写色归零。
+- [x] **发现并清理 1 处复检遗留**：`en_tool:draft:vocab:m4-复检临时词条m4-review-check`（复检会话经 UI 建词条测试 R-2 时触发草稿暂存，其记录清理了另一枚但漏此枚）——审查会话已清除，两源 localStorage 归零；审查自身临时词条（m4-review-check）文件系统建删闭环。
