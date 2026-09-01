@@ -61,6 +61,7 @@ const delay = (i: number) => ({ animationDelay: `calc(var(--stagger-step) * ${i}
 }
 
 .note-row {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -87,12 +88,37 @@ const delay = (i: number) => ({ animationDelay: `calc(var(--stagger-step) * ${i}
   min-width: 0;
 }
 
+/* 整行可点（UX 打磨）：标题链接伪元素铺满整行，行内任意位置点击 = 打开词条；
+   拉伸由伪元素完成而非 <a> 包裹整行——「行内标题与标签均为独立链接，避免嵌套」
+   的模板约束不变。标签（.tag-badge）定位提升保持浮在拉伸层之上，跳转标签页不变 */
+.row-main::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+/* 键盘 Tab 聚焦标题链接时，焦点环随拉伸层圈住整行（沿用 M7 全局 focus-visible 约定） */
+.row-main:focus-visible {
+  outline: none;
+}
+
+.row-main:focus-visible::after {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+/* 标签悬浮于拉伸层之上（DOM 在后 + 定位提升同层），点击仍进标签页 */
+.tag-badge {
+  position: relative;
+}
+
 .row-title-link {
   text-decoration: none;
   color: var(--color-text);
 }
 
-.row-title-link:hover .row-title {
+.note-row:hover .row-title {
   color: var(--color-accent);
 }
 
