@@ -231,14 +231,3 @@ button:focus-visible {
 .tag-pair-5 { background: var(--tag-5-bg); color: var(--tag-5-c); }
 .tag-pair-6 { background: var(--tag-6-bg); color: var(--tag-6-c); }
 .tag-pair-7 { background: var(--tag-7-bg); color: var(--tag-7-c); }
-
-/* 色板色点应用类（v1.1 迭代④）：填充文字色（--tag-N-c，饱和中调）而非洗底（--tag-N-bg）——
-   小尺寸色点在浅/深托盘上都需高色相辨识度，pastel/微光洗底仅适合大面积承托 */
-.tag-dot-0 { background: var(--tag-0-c); }
-.tag-dot-1 { background: var(--tag-1-c); }
-.tag-dot-2 { background: var(--tag-2-c); }
-.tag-dot-3 { background: var(--tag-3-c); }
-.tag-dot-4 { background: var(--tag-4-c); }
-.tag-dot-5 { background: var(--tag-5-c); }
-.tag-dot-6 { background: var(--tag-6-c); }
-.tag-dot-7 { background: var(--tag-7-c); }

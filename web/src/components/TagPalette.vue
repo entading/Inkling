@@ -10,9 +10,9 @@ const emit = defineEmits<{ (e: 'select', color: number): void }>()
 const COLORS = [0, 1, 2, 3, 4, 5, 6, 7]
 
 /**
- * pulse 模式（全染色卡宿主）：卡体洗底即"当前色"，选中环改为点击后亮起→衰减熄灭的
- * 一次性脉冲（--duration-pulse），不留常驻元素；ring 模式（幽灵卡表单/详情页等无洗底
- * 宿主）维持常亮选中环。aria-pressed 恒反映当前色，视觉与语义解耦。
+ * pulse 模式（色卡墙宿主）：卡体洗底即"当前色"，选中环改为点击后亮起→衰减熄灭的
+ * 一次性脉冲（--duration-pulse），不留常驻元素；ring 模式（幽灵卡表单/详情页等宿主）
+ * 维持常亮选中环。aria-pressed 恒反映当前色，视觉与语义解耦。
  */
 const justSet = ref<number | null>(null)
 let pulseTimer: number | undefined
@@ -45,10 +45,9 @@ onBeforeUnmount(() => window.clearTimeout(pulseTimer))
       :title="`色板 ${c + 1}`"
       @click="onSelect(c)"
     >
-      <!-- 色点由内层 span 承接应用类：填充用 .tag-dot-N（饱和文字色，浅深托盘皆高辨识）
-           而非 .tag-pair-N 洗底（v1.1 迭代④）；scoped 规则不得给 dot 设 background/color
-           （M2' 铁律的按钮变体） -->
-      <span class="swatch-dot" :class="[`tag-dot-${c}`, size === 'sm' && 'swatch-dot-sm']" />
+      <!-- 色点必须由内层 span 承接 .tag-pair-N：scoped 类特异性（含 [data-v]）压过全局应用类，
+           本组件任何 scoped 规则都不得给 dot 设 background/color（M2' 铁律的按钮变体） -->
+      <span class="swatch-dot" :class="[`tag-pair-${c}`, size === 'sm' && 'swatch-dot-sm']" />
     </button>
   </div>
 </template>
@@ -80,7 +79,7 @@ onBeforeUnmount(() => window.clearTimeout(pulseTimer))
   box-shadow: inset 0 0 0 1px var(--color-border);
 }
 
-/* 紧凑档：色卡墙卡内使用（三列网格内宽有限） */
+/* 紧凑档（sm）：色卡墙卡内使用 */
 .swatch-dot-sm {
   width: 14px;
   height: 14px;
