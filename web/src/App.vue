@@ -53,6 +53,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
         <kbd class="kbd-hint">{{ kbdHint }}</kbd>
       </button>
 
+      <!-- 新建词条入口（UX 打磨）：全站常驻主操作，与搜索入口同宽堆叠；
+           移动端侧栏整体隐藏，新建由 FAB 承担 -->
+      <RouterLink to="/new" class="new-entry">
+        <Icon name="plus" :size="16" />
+        <span>新建词条</span>
+      </RouterLink>
+
       <nav class="nav">
         <RouterLink to="/" class="nav-item" exact-active-class="active">
           <Icon :name="NAV_ICONS['/']" :size="16" />
@@ -201,6 +208,30 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
   border-radius: var(--radius-sm);
 }
 
+/* 新建词条入口（UX 打磨）：强调色实心，1px 同色描边对齐 search-entry 盒高 */
+.new-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: calc(100% - var(--space-4) * 2);
+  margin: var(--space-2) var(--space-4) 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition: opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.new-entry:hover {
+  opacity: 0.88;
+}
+
 .nav {
   margin-top: var(--space-6);
   display: flex;
@@ -264,7 +295,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
     transform: translateY(-4px);
   }
 
-  .search-entry:active {
+  .search-entry:active,
+  .new-entry:active {
     transform: scale(0.98);
   }
 }

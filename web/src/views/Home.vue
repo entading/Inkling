@@ -60,8 +60,6 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="home-actions">
-        <RouterLink to="/new" class="new-btn">＋ 新建词条</RouterLink>
-
         <div ref="menuRoot" class="top-menu">
           <button
             type="button"
@@ -141,23 +139,6 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: var(--space-3);
   flex-shrink: 0;
-}
-
-/* 主按钮（强调色实心），桌面与移动端均可见（设计 5.1 新建词条快捷入口） */
-.new-btn {
-  padding: var(--space-2) var(--space-4);
-  font-size: var(--text-base);
-  border-radius: var(--radius-md);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  text-decoration: none;
-  white-space: nowrap;
-  transition: opacity var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
-}
-
-.new-btn:hover {
-  opacity: 0.88;
 }
 
 .title {
@@ -403,7 +384,6 @@ onBeforeUnmount(() => {
 /* 按压反馈（§6）：全部新增动画统一包在 no-preference 内；
    .board-card 的 :active 须在 :hover 规则之后，按下时以 scale 覆盖悬浮 translateY */
 @media (prefers-reduced-motion: no-preference) {
-  .new-btn:active,
   .menu-btn:active,
   .board-card:active {
     transform: scale(0.98);
