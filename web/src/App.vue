@@ -185,7 +185,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
   align-items: center;
   gap: var(--space-2);
   width: calc(100% - var(--space-4) * 2);
-  margin: var(--space-3) var(--space-4) 0;
+  margin: var(--space-5) var(--space-4) 0;
   padding: var(--space-2) var(--space-3);
   font-family: inherit;
   font-size: var(--text-base);
@@ -249,7 +249,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
 }
 
 /* 分区分组（UX 打磨）：文字嵌线——两侧 ::before/::after 拉出 1px 线，文字居中；
-   上 12px 拉开与前组节奏，下 8px 接工具区首项 */
+   默认上 12px（组内分隔，如「更多」），下 8px 接组内首项 */
 .nav-sep {
   display: flex;
   align-items: center;
@@ -257,6 +257,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
   margin: var(--space-3) var(--space-3) var(--space-2);
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
+}
+
+/* 段落级嵌线（导航列表第一条，紧随动作区）单独拉开节奏至 24px */
+.nav-sep:first-child {
+  margin-top: var(--space-5);
 }
 
 .nav-sep::before,
