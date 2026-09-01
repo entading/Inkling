@@ -178,3 +178,17 @@
 - 前置提交：`docs: M2' 独立审查补记与进度标注回写（上会话遗留未提交）`（`f445919`，清工作区历史，不属 M3' 内容）
 - 本记录 + `UI优化设计方案.md` §12 标注 + AGENTS.md M3' 回写 + `UI-M3截图/`（9 张）：`docs:` 提交
 - 截图：skeleton-board-light / skeleton-board-dark / skeleton-note-dark / skeleton-home-dark / skeleton-home-light / home-after-transition-light / home-after-transition-dark / note-after-transition-light / note-after-transition-dark / mobile-home-dark（10 张，骨架屏浅/深、转场后首页与阅读页终态浅/深、移动端首页深色全部覆盖；transition.webm 未交付见偏离 #12）
+
+## 审查（第三轮，2026-09-01，独立审查会话）
+
+对已提交状态（HEAD = a294773）独立复验，**结论：通过验收，零代码缺陷**。本轮审查环境 rAF 健康（52 帧/300ms，与实施会话的遮挡节流不同），得以补充实施会话无法完成的**实时中间态证据**：
+
+- [x] **代码核对**：tokens.css 四枚新令牌（`--duration-page: 160ms` / `--stagger-step: 24ms` / `--duration-shimmer: 1400ms` / `--skeleton-shimmer` 浅深双值）、App.vue RouterView v-slot + Transition out-in + key=route.path、`lib/stagger.ts` 视图级 arm 窗口（令牌推导时长、布尔反转 bug 修复逻辑在位）、NoteList 无状态 + `.stagger-arm` 门控、`.hint` 死选择器已清（e9cc588），逐项与设计文档 §6 一致。
+- [x] **独立实测（rAF 健康环境下）**：
+  - **转场实时编排采样**：点击导航后逐帧采样捕获完整 out-in 时序——leave-from(13ms)→leave-to(18ms)→enter-from(186ms)→enter-to(199ms)→全清(356ms)，与 `--duration-page` 160ms 精确吻合，终态零残留类（补上了实施会话因节流缺失的中间帧证据）；
+  - **stagger 完整生命周期**：刷新后立即捕获 `.stagger-arm` 武装态（row-0 携带 row-in + 内联 `calc(var(--stagger-step) * 0)`、animationName=row-in-* 真实运行），2s 后窗口过期 arm 摘除、零行动画态；arm 过期后过滤 6→2 行零重播；
+  - **骨架屏**：临时 sleep(1500ms) 注入（git 跟踪、验后 `git checkout` 还原、grep 归零）——6 行骨架复用 .note-row 规格、surface-2 底、shimmer skeleton-sweep 1.4s running、双条结构贴合真实行；
+  - **CSSOM**：10 组 `:active` scale(0.98) 规则（含定位 chip 组合 transform）、动画规则守卫扫描 violations=[]、theme-transitioning 守卫未破坏；
+  - **回归**：主题切换正常、wiki 悬停预览正常（注意其委托事件是 `mouseover` 非 mouseenter——审查首测用错事件导致假阴性，已纠正）、深色抽查 4 页 opacity=1 零转场残留、移动端 5 图标零横滚。
+- [x] **构建与隔离**：`npm run build` 产物 hash（index-TmimObfk.css / index-DtATiXad.js）与复检一致；`2abe757..HEAD` 对 server/、notes/、markdown.ts、theme.ts、tts.ts、index.html、fonts.css 零改动；s 字面值/reduce 覆盖分支/测试注入标记 grep 归零。
+- [备注] 审查未复现 13 行 cap-13 场景（实施会话的临时词条已删，无法低成本重建）——cap 逻辑以 `STAGGER_CAP=12` 代码走查 + 实施与复检两轮 errs=[] 实测记录为准；审查会话工作量归零确认：工作区仅剩三份未跟踪交接提示词。
