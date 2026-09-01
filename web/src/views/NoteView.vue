@@ -394,7 +394,6 @@ async function refreshMissingLinks(): Promise<void> {
   margin: 0 auto;
 }
 
-.hint,
 .error {
   color: var(--color-text-secondary);
 }
