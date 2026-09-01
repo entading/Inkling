@@ -45,6 +45,15 @@ export interface ServerInfo {
   notesDir: string
 }
 
+/** 标签注册表单条目（v1.1）：color 为 0–7 色板索引 */
+export interface TagRegistryEntry {
+  color: number
+  created: string
+}
+
+/** 标签注册表：键 = 标签名，持久化于服务端 data/tags.json */
+export type TagRegistry = Record<string, TagRegistryEntry>
+
 /** API 错误：message 为服务端 error 字段，status 供调用方区分（如新建 409 冲突） */
 export class ApiError extends Error {
   status: number
@@ -98,5 +107,13 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lanEnabled }),
+    }),
+  tags: () => fetchJson<TagRegistry>('/api/tags'),
+  /** upsert：已存在仅更新颜色；响应为全量注册表 */
+  upsertTag: (tag: string, color: number) =>
+    fetchJson<TagRegistry>('/api/tags', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tag, color }),
     }),
 }

@@ -57,7 +57,9 @@ function setDensity(d: Density): void {
   }
 }
 
-/** 当前板块标签聚合（tag→count，count 降序、同数按标签升序） */
+/** 当前板块标签聚合（tag→count，count 降序、同数按标签升序）。
+ * 口径 = 仅词条携带的标签（笔记 frontmatter 聚合），不含注册表中 count=0 的标签——
+ * 板块页筛的是「词条拥有的标签」（v1.1 设计 §3），勿接入 tagRegistryRef */
 const boardTags = computed(() => {
   const counts = new Map<string, number>()
   for (const n of notes.value) {
