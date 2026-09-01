@@ -59,6 +59,12 @@ textarea {
   /* 骨架屏高光：中性灰底上的白色叠加扫光，双主题同构、仅透明度分层（浅 0.65 / 深 0.07） */
   --skeleton-shimmer: rgba(255, 255, 255, 0.65);
 
+  /* 色卡墙全染卡渐层（v1.1 迭代⑦，浅色）：165° 对角淡出——左上保持洗底本色，
+     右下缓缓融向卡纸色（surface），颜料纵深质感；透明端经 color-mix 由现有令牌派生 */
+  --card-sheen: linear-gradient(165deg,
+    transparent 38%,
+    color-mix(in srgb, var(--color-surface) 62%, transparent) 100%);
+
   /* 字号阶梯（M2' 起替换各组件散写 rem 值） */
   --text-xs: 0.78rem;
   --text-sm: 0.88rem;
@@ -172,6 +178,14 @@ textarea {
 
   /* 深色骨架高光：暗底上压暗会失去对比，改为极淡白色提亮扫描 */
   --skeleton-shimmer: rgba(255, 255, 255, 0.07);
+
+  /* 色卡墙全染卡渐层（v1.1 迭代⑦，深色标准档）：左上以该卡文字色（--card-hue，
+     由卡内联注入）打一圈辉光 + 洗底与文字色 25/75 混合增饱和——色相亮度抬升，
+     根治深色洗底叠近黑页底的发闷发黑；透明度全部经 color-mix 由现有令牌派生 */
+  --card-sheen: radial-gradient(120% 95% at 18% 0%,
+      color-mix(in srgb, var(--card-hue, var(--color-accent)) 17%, transparent) 0%, transparent 62%),
+    linear-gradient(color-mix(in srgb, var(--card-hue, var(--color-accent)) 25%, var(--card-wash, transparent)),
+      color-mix(in srgb, var(--card-hue, var(--color-accent)) 25%, var(--card-wash, transparent)));
 
   /* 深色阴影弱化为更深色（分层主要靠表面亮度阶梯 + 边框） */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
