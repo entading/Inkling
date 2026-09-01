@@ -124,4 +124,18 @@
 - [x] **复检自身残留清理**：临时词条 m5-rc 文件系统建删、notes/ 零 git 痕迹；`en_tool:draft:vocab:m5-rc` 由保存成功路径与手动清理双保险归零；localStorage 终态仅余 `en_tool:theme=system` + `en_tool:density=cozy`（合法偏好键）；验证用 stub/垫片零落盘（grep 自查）。
 - [备注] **复检会话 IAB 健康度**：两轮 rAF 探针健康（34–50 帧/200–300ms），rAF 依赖路径在健康窗口完成；「假死」均确认源于模态 confirm 而非遮挡节流（与本轮实施会话的 rAF 停摆事件性质不同，勿混淆）。
 
+## 审查（第三轮，2026-09-01，独立审查会话）
+
+对已提交状态（HEAD = 559496b）独立复验，**结论：通过验收，零代码缺陷；UI 焕新阶段（M1'–M5'）至此全部通过独立审查，正式收官**。核实范围与结果：
+
+- [x] **提交隔离与禁区**：`570a213`（feat）恰 5 文件（App.vue / FloatingActions.vue 新建 / Icon.vue / Board.vue / EditView.vue）；`1139467..HEAD` 对 server/、notes/、index.html、lib 全部、CommandPalette、NoteView、MarkdownViewer、Skeleton 等零改动；组件散写色归零；收官标注（设计方案 §12「UI 焕新阶段收官」小结 + AGENTS 当前状态改写）齐备。
+- [x] **代码核对**：`insertTextAtSelection`（execCommand 优先 → setRangeText 降级）、`insertWikiHint`（vocab 裸 slug / 非 vocab `board/slug` 前缀，与 parseWikiTarget 语义对应）、IME 组合守卫（`isComposing || keyCode === 229`，复检修复 R-1 在位）、补全浮层水平钳制（R-2 在位）、Board `pushRouteQuery`/`syncFromRoute` 往返（空键删除）、FloatingActions（reduced-motion 点击时读取 → auto、listener 卸载清理、pop 过渡入 no-preference 块）。
+- [x] **独立实测（browser-use，rAF 健康环境）**：
+  - **编辑器**：无改动 Ctrl+S → PUT 计数 0；execCommand 追加行（走 v-model 同步）→ Ctrl+S → PUT 1 + 「已保存 ✓」；Tab 文末插两空格；工具条加粗选中「验证」→ `**验证**`（六按钮 title 齐全）；`[[ser` → Enter 插入 `[[serendipity]]`、`[[abandon` ↓ 选短语 → `[[phrase/abandon-oneself-to]]`；IME `isComposing:true` 的 Enter → 零插入且浮层保持开（守卫实证）；Esc → 浮层关闭且停留编辑页（**注**：审查首次用 `[class*="hint"]` 通配选择器误匹配 v1 既有加载 `.hint` 类产生假阴性，改精确 `.wiki-hint` 后通过——审查手法教训非应用缺陷）；**撤销栈保真**：`execCommand('undo')` 逐步回退两空格/追加行两个独立 insertText 步骤（跨 evaluate 焦点机制的加粗步异常经同 evaluate 隔离重测排除，inserted→undo→干净还原）；
+  - **板块筛选**：cet6 单选 → `?tags=cet6` 3 条；追加 cet4 → `?tags=cet6,cet4` 4 条（OR）；搜索 ser → 1 条（AND）；`history.back()` → 回 `?tags=cet6` 3 条（URL+列表三方一致）；`?sort=updated` → 扁平列表 + 日期严格倒序（AZIndex 显隐决策实证）；再点激活段 → 参数清空 + AZIndex 恢复；密度 compact/cozy → 根类 + `en_tool:density` + 行 padding 8px 12px / 12px 16px 双向实测；
+  - **FAB 与回顶**：375 视口 FAB（48px、右下）点击 → /new；/new 页隐藏；回顶在 maxScroll>600 长页出现（bottom 128px = FAB 72+56 堆叠、z=40=--z-nav）、点击滚动归零后消失（**审查首次两页 maxScroll<600 未达阈值属选页不当**，矮视口后通过）；
+  - **移动端编辑页**：工具条 6 按钮可见 + 源码/预览 chips 在位。
+- [x] **构建与残留**：`npm run build` JS 产物 hash（index-Bo4Ad05o.js）与复检 preview 记录一致；审查临时词条（m5-review-check，文件系统建删）与草稿 key 归零；localStorage 终态仅余 `en_tool:theme=system` + `en_tool:density=cozy` 两枚合法偏好。
+- [备注] 审查会话复现两处既有行为（非缺陷）：编辑页停留 >3s 自动写草稿快照（v1 既有，内容与磁盘一致）；4173 孤儿进程端口占用（连续第五个里程碑，预案处理）。
+
 
