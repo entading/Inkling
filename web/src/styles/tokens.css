@@ -245,3 +245,24 @@ button:focus-visible {
 .tag-pair-5 { background: var(--tag-5-bg); color: var(--tag-5-c); }
 .tag-pair-6 { background: var(--tag-6-bg); color: var(--tag-6-c); }
 .tag-pair-7 { background: var(--tag-7-bg); color: var(--tag-7-c); }
+
+/* 色板色点应用类（v1.1 迭代⑧，主题感知）：浅色取洗底（--tag-N-bg 粉彩，浅托盘上柔和，
+   与真实标签观感一致）；深色取文字色（--tag-N-c 亮色档）——深色低透明洗底缩成小点
+   必然发黑难辨，亮色档才是 dark 模式的 swatch 语言（与深色文字/辉光同源） */
+.tag-dot-0 { background: var(--tag-0-bg); }
+.tag-dot-1 { background: var(--tag-1-bg); }
+.tag-dot-2 { background: var(--tag-2-bg); }
+.tag-dot-3 { background: var(--tag-3-bg); }
+.tag-dot-4 { background: var(--tag-4-bg); }
+.tag-dot-5 { background: var(--tag-5-bg); }
+.tag-dot-6 { background: var(--tag-6-bg); }
+.tag-dot-7 { background: var(--tag-7-bg); }
+
+[data-theme='dark'] .tag-dot-0 { background: var(--tag-0-c); }
+[data-theme='dark'] .tag-dot-1 { background: var(--tag-1-c); }
+[data-theme='dark'] .tag-dot-2 { background: var(--tag-2-c); }
+[data-theme='dark'] .tag-dot-3 { background: var(--tag-3-c); }
+[data-theme='dark'] .tag-dot-4 { background: var(--tag-4-c); }
+[data-theme='dark'] .tag-dot-5 { background: var(--tag-5-c); }
+[data-theme='dark'] .tag-dot-6 { background: var(--tag-6-c); }
+[data-theme='dark'] .tag-dot-7 { background: var(--tag-7-c); }
