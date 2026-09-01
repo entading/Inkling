@@ -4,8 +4,10 @@ import { useRoute, RouterLink } from 'vue-router'
 import NoteList from '../components/NoteList.vue'
 import AZIndex from '../components/AZIndex.vue'
 import EmptyState from '../components/EmptyState.vue'
+import Skeleton from '../components/Skeleton.vue'
 import { api, type Board, type NoteDetail, type NoteMeta } from '../api'
 import { getSearchIndex, searchBoard } from '../lib/search'
+import { useStaggerArm } from '../lib/stagger'
 
 const props = defineProps<{ board: Board }>()
 
@@ -21,6 +23,9 @@ const boardLabels: Record<Board, string> = {
 const notes = ref<NoteMeta[]>([])
 const loading = ref(true)
 const error = ref('')
+
+// 入场 stagger 窗口（§6）：数据就绪后短暂挂 stagger-arm 祖先类，波浪后摘除
+const staggerArm = useStaggerArm(loading)
 
 const query = ref('')
 const fulltext = ref(false)
@@ -79,7 +84,7 @@ watch(() => route.query, syncFromRoute)
 </script>
 
 <template>
-  <div class="board-page">
+  <div class="board-page" :class="{ 'stagger-arm': staggerArm }">
     <header class="board-header">
       <h1 class="board-title">{{ boardLabels[board] }}</h1>
       <div class="board-header-right">
@@ -114,7 +119,12 @@ watch(() => route.query, syncFromRoute)
     <p v-else-if="fulltext && !indexData && query.trim()" class="hint">全文索引加载中…</p>
 
     <p v-if="error" class="error">加载失败：{{ error }}</p>
-    <p v-else-if="loading" class="hint">加载中…</p>
+    <div v-else-if="loading" class="board-skeleton" aria-hidden="true">
+      <div v-for="i in 6" :key="i" class="skeleton-row">
+        <Skeleton class="sk-row-title" />
+        <Skeleton class="sk-row-side" />
+      </div>
+    </div>
     <EmptyState
       v-else-if="query.trim() && filtered.length === 0"
       :title="`没有匹配「${query.trim()}」的词条`"
@@ -168,7 +178,9 @@ watch(() => route.query, syncFromRoute)
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   text-decoration: none;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .new-link:hover {
@@ -202,7 +214,8 @@ watch(() => route.query, syncFromRoute)
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .board-search-input::placeholder {
@@ -228,7 +241,10 @@ watch(() => route.query, syncFromRoute)
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  transition: color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .chip:hover {
@@ -256,7 +272,9 @@ watch(() => route.query, syncFromRoute)
   border: 1px solid var(--color-accent);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .empty-clear:hover {
@@ -266,6 +284,48 @@ watch(() => route.query, syncFromRoute)
 
 .error {
   color: var(--color-danger);
+}
+
+/* 加载骨架（§6）：行容器复用 .note-row 的规格（surface 底/border/radius/padding），
+   内容条高度走 --text-* 贴合真实文本，减少加载完成时的布局跳动 */
+.board-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.sk-row-title {
+  height: var(--text-md);
+  width: 42%;
+}
+
+.sk-row-side {
+  height: var(--text-xs);
+  width: 24%;
+}
+
+/* 按压反馈（§6）：全部新增动画统一包在 no-preference 内 */
+@media (prefers-reduced-motion: no-preference) {
+  .new-link:active,
+  .empty-clear:active {
+    transform: scale(0.98);
+  }
+
+  /* chip 以 translateY(-50%) 垂直居中，:active 需组合保留否则按住时会跳位 */
+  .chip:active {
+    transform: translateY(-50%) scale(0.98);
+  }
 }
 
 @media (max-width: 767px) {

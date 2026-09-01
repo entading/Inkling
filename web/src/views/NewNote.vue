@@ -224,7 +224,8 @@ async function submit() {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .form-input:focus {
@@ -276,7 +277,8 @@ async function submit() {
   background: var(--color-accent);
   color: var(--color-on-accent);
   cursor: pointer;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .submit-btn:hover {
@@ -286,6 +288,13 @@ async function submit() {
 .submit-btn:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* 按压反馈（§6）：全部新增动画统一包在 no-preference 内 */
+@media (prefers-reduced-motion: no-preference) {
+  .submit-btn:active {
+    transform: scale(0.98);
+  }
 }
 
 @media (max-width: 767px) {

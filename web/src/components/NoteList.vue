@@ -2,14 +2,27 @@
 import { RouterLink } from 'vue-router'
 import EmptyState from './EmptyState.vue'
 import TagBadge from './TagBadge.vue'
+import { STAGGER_CAP } from '../lib/stagger'
 import type { NoteMeta } from '../api'
 
 defineProps<{ notes: NoteMeta[] }>()
+
+// ---------- 入场 stagger（§6）----------
+// 本组件无状态：前 STAGGER_CAP 行携带 row-in 类与递增内联 delay；是否真正播放由
+// 祖先 .stagger-arm（视图数据就绪后的入场窗口，见 lib/stagger.ts）门控——导航入场
+// 播一次波浪，页内过滤/标签重组重建列表时祖先类已摘除，零重播。
+const play = (i: number) => i < STAGGER_CAP
+const delay = (i: number) => ({ animationDelay: `calc(var(--stagger-step) * ${i})` })
 </script>
 
 <template>
   <ul v-if="notes.length" class="note-list">
-    <li v-for="note in notes" :key="`${note.board}/${note.slug}`">
+    <li
+      v-for="(note, i) in notes"
+      :key="`${note.board}/${note.slug}`"
+      :class="{ 'row-in': play(i) }"
+      :style="play(i) ? delay(i) : undefined"
+    >
       <!-- 行内标题与标签均为独立链接，避免 <a> 嵌套 -->
       <div class="note-row">
         <RouterLink
@@ -56,8 +69,9 @@ defineProps<{ notes: NoteMeta[] }>()
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease,
-    transform 0.15s ease;
+  transition: border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .note-row:hover {
@@ -135,11 +149,32 @@ defineProps<{ notes: NoteMeta[] }>()
   background: var(--color-accent);
   color: var(--color-on-accent);
   text-decoration: none;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .empty-cta:hover {
   opacity: 0.88;
+}
+
+/* 入场 stagger（§6）：动画门控在视图入场窗口祖先类 .stagger-arm 之下（lib/stagger.ts），
+   窗口内挂载的列表播一次波浪（cap 前 12 项逐项递增 delay，内联注入）；页内过滤/重组
+   重建的列表拿不到该祖先类 → 零重播。与全部新增动画一致包在 no-preference 内 */
+@media (prefers-reduced-motion: no-preference) {
+  .stagger-arm .row-in {
+    animation: row-in var(--duration-slow) var(--ease-out) backwards;
+  }
+
+  @keyframes row-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+
+  .empty-cta:active {
+    transform: scale(0.98);
+  }
 }
 
 @media (max-width: 767px) {

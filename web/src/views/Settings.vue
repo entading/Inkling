@@ -311,7 +311,8 @@ onMounted(load)
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
 }
 
 .theme-opt:hover {
@@ -363,7 +364,7 @@ onMounted(load)
   height: 24px;
   border-radius: var(--radius-full);
   background: var(--color-border);
-  transition: background-color 0.2s ease;
+  transition: background-color var(--duration-base) var(--ease-out);
 }
 
 .thumb {
@@ -375,7 +376,7 @@ onMounted(load)
   border-radius: var(--radius-full);
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
-  transition: transform 0.2s ease;
+  transition: transform var(--duration-base) var(--ease-out);
 }
 
 .switch input:checked + .track {
@@ -490,7 +491,7 @@ onMounted(load)
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: border-color 0.15s ease;
+  transition: border-color var(--duration-fast) var(--ease-out);
 }
 
 .tts-select:hover:not(:disabled) {
@@ -516,7 +517,9 @@ onMounted(load)
   border: 1px solid var(--color-accent);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .tts-preview:hover:not(:disabled) {
@@ -527,6 +530,13 @@ onMounted(load)
 .tts-preview:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* 按压反馈（§6）：全部新增动画统一包在 no-preference 内 */
+@media (prefers-reduced-motion: no-preference) {
+  .tts-preview:active {
+    transform: scale(0.98);
+  }
 }
 
 .tts-note {

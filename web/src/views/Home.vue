@@ -4,7 +4,9 @@ import { RouterLink } from 'vue-router'
 import Icon, { type IconName } from '../components/Icon.vue'
 import NoteList from '../components/NoteList.vue'
 import SearchPanel from '../components/SearchPanel.vue'
+import Skeleton from '../components/Skeleton.vue'
 import { api, type Board, type BoardInfo, type NoteMeta } from '../api'
+import { useStaggerArm } from '../lib/stagger'
 
 /** 板块卡图标（§4）：chip 底/图标/计数走 --board-* 个性色，卡片其余部分保持中性色 */
 const BOARD_ICONS: Record<Board, IconName> = {
@@ -18,6 +20,9 @@ const boards = ref<BoardInfo[]>([])
 const recent = ref<NoteMeta[]>([])
 const loading = ref(true)
 const error = ref('')
+
+// 入场 stagger 窗口（§6）：数据就绪后短暂挂 stagger-arm 祖先类，波浪后摘除
+const staggerArm = useStaggerArm(loading)
 
 /** 移动端右上角菜单（标签/设置入口，设计 3.3） */
 const menuOpen = ref(false)
@@ -47,7 +52,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="home">
+  <div class="home" :class="{ 'stagger-arm': staggerArm }">
     <div class="home-top">
       <div class="home-heading">
         <p class="eyebrow">个人英语学习知识沉淀库</p>
@@ -79,7 +84,23 @@ onBeforeUnmount(() => {
     <SearchPanel autofocus />
 
     <p v-if="error" class="error">加载失败：{{ error }}（请确认服务端已启动）</p>
-    <p v-else-if="loading" class="hint">加载中…</p>
+    <div v-else-if="loading" class="home-skeleton" aria-hidden="true">
+      <Skeleton class="sk-section" w="56px" />
+      <div class="sk-boards">
+        <div v-for="i in 4" :key="i" class="sk-board-card">
+          <Skeleton class="sk-chip" w="40px" h="40px" r="var(--radius-md)" />
+          <Skeleton class="sk-label" />
+          <Skeleton class="sk-count" />
+        </div>
+      </div>
+      <Skeleton class="sk-section sk-section-late" w="88px" />
+      <div class="sk-rows">
+        <div v-for="i in 6" :key="i" class="sk-row">
+          <Skeleton class="sk-row-title" />
+          <Skeleton class="sk-row-side" />
+        </div>
+      </div>
+    </div>
     <template v-else>
       <h2 class="section-title">板块</h2>
       <div class="boards">
@@ -131,7 +152,8 @@ onBeforeUnmount(() => {
   color: var(--color-on-accent);
   text-decoration: none;
   white-space: nowrap;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .new-btn:hover {
@@ -160,7 +182,9 @@ onBeforeUnmount(() => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .menu-btn:hover {
@@ -221,8 +245,9 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease,
-    transform 0.15s ease;
+  transition: border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .board-card:hover {
@@ -301,12 +326,88 @@ onBeforeUnmount(() => {
   margin: 0 0 var(--space-2);
 }
 
-.hint {
-  color: var(--color-text-secondary);
-}
-
 .error {
   color: var(--color-danger);
+}
+
+/* 加载骨架（§6）：SearchPanel 常驻在 loading 分支外，骨架只复刻板块卡格与最近添加列表；
+   板块卡/行容器沿用真实组件的容器规格，内容条高度走 --text-* */
+.home-skeleton {
+  display: flex;
+  flex-direction: column;
+}
+
+.sk-section {
+  height: var(--text-lg);
+  margin-bottom: var(--space-4);
+}
+
+/* 真实 h2.section-title 与上方内容间距为 space-7（搜索框下方一份由其自身 margin 提供） */
+.sk-section-late {
+  margin-top: var(--space-7);
+}
+
+.sk-boards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-4);
+}
+
+.sk-board-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.sk-label {
+  height: var(--text-md);
+  width: 55%;
+}
+
+.sk-count {
+  height: var(--text-xl);
+  width: 30%;
+}
+
+.sk-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.sk-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.sk-row-title {
+  height: var(--text-md);
+  width: 42%;
+}
+
+.sk-row-side {
+  height: var(--text-xs);
+  width: 24%;
+}
+
+/* 按压反馈（§6）：全部新增动画统一包在 no-preference 内；
+   .board-card 的 :active 须在 :hover 规则之后，按下时以 scale 覆盖悬浮 translateY */
+@media (prefers-reduced-motion: no-preference) {
+  .new-btn:active,
+  .menu-btn:active,
+  .board-card:active {
+    transform: scale(0.98);
+  }
 }
 
 @media (max-width: 767px) {

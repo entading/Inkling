@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import NoteList from '../components/NoteList.vue'
 import { BOARD_LABELS, BOARD_ORDER, getSearchIndex } from '../lib/search'
 import type { NoteDetail } from '../api'
+import { useStaggerArm } from '../lib/stagger'
 
 const route = useRoute()
 
@@ -16,6 +17,9 @@ interface Group {
 const loading = ref(true)
 const error = ref('')
 const index = ref<NoteDetail[] | null>(null)
+
+// 入场 stagger 窗口（§6）：数据就绪后短暂挂 stagger-arm 祖先类，波浪后摘除
+const staggerArm = useStaggerArm(loading)
 
 // vue-router 已对 :tag 参数做过 URL 解码，直接使用即可（再解码会破坏含 % 的标签）
 const tag = computed(() => String(route.params.tag ?? ''))
@@ -50,7 +54,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="tag-detail-page">
+  <div class="tag-detail-page" :class="{ 'stagger-arm': staggerArm }">
     <header class="page-header">
       <h1 class="page-title">
         <span class="hash">#</span>{{ tag }}

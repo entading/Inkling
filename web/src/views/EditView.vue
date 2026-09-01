@@ -366,7 +366,7 @@ watch(() => route.params, load)
   color: var(--color-text-secondary);
   text-decoration: none;
   font-size: var(--text-base);
-  transition: color 0.15s ease;
+  transition: color var(--duration-fast) var(--ease-out);
 }
 
 .back-link:hover {
@@ -410,7 +410,8 @@ watch(() => route.params, load)
   background: var(--color-accent);
   color: var(--color-on-accent);
   cursor: pointer;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .save-btn:hover {
@@ -441,7 +442,10 @@ watch(() => route.params, load)
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  transition: color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .chip:hover {
@@ -476,6 +480,7 @@ watch(() => route.params, load)
   font-size: var(--text-md);
   line-height: 1;
   cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-out);
 }
 
 .banner-close:hover {
@@ -497,10 +502,21 @@ watch(() => route.params, load)
   font-weight: 600;
   cursor: pointer;
   text-decoration: underline;
+  transition: transform var(--duration-fast) var(--ease-out);
 }
 
 .banner-action:hover {
   opacity: 0.8;
+}
+
+/* 按压反馈（§6）：全部新增动画统一包在 no-preference 内 */
+@media (prefers-reduced-motion: no-preference) {
+  .save-btn:active,
+  .chip:active,
+  .banner-close:active,
+  .banner-action:active {
+    transform: scale(0.98);
+  }
 }
 
 .hint,
@@ -554,7 +570,8 @@ watch(() => route.params, load)
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   resize: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .source-input:focus {
