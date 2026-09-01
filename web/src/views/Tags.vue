@@ -10,10 +10,9 @@ import TagPalette from '../components/TagPalette.vue'
 import { useStaggerArm, STAGGER_CAP } from '../lib/stagger'
 
 /**
- * 标签页 = 色卡墙（v1.1 体验迭代第 2/3/4 轮，方案 A → 微调 → 中性色卡）：
- * union 全量标签一卡一位——中性卡体（surface + 左彩条 + 色名着色，--card-accent
- * 指向 --tag-N-c）承担浏览导航（整卡 stretched-link 进详情）与改色（surface-2 托盘
- * 内高饱和色板，pulse 点击脉冲）；末尾虚线幽灵卡承担创建（upsert 语义不变）。
+ * 标签页 = 色卡墙（v1.1 体验迭代第 2–5 轮；第 5 轮按用户决定回退至方案 A 原全染设计）：
+ * union 全量标签一卡一位——卡体 .tag-pair-N 全染洗底（文字色经继承），整卡 stretched-link
+ * 进详情，卡内色板点色即改（pulse 脉冲）；末尾虚线幽灵卡承担创建（upsert 语义不变）。
  */
 
 const tags = ref<TagCount[]>([])
@@ -86,18 +85,10 @@ const filtered = computed<TagCount[]>(() => {
 
 const colorIndex = (tag: string) => tagColorIndex(tag)
 
-/** 卡体强调色（彩条/标签名）指向当前色的文字色令牌；内联注入保持令牌引用 */
-function cardStyle(tag: string, i: number): Record<string, string> {
-  const style: Record<string, string> = {
-    '--card-accent': `var(--tag-${colorIndex(tag)}-c)`,
-  }
-  if (play(i)) style.animationDelay = `calc(var(--stagger-step) * ${i})`
-  return style
-}
-
 // ---------- 入场 stagger（同 NoteList 配方：cap 前携带递增内联 delay，祖先 stagger-arm 门控） ----------
 
 const play = (i: number) => i < STAGGER_CAP
+const delay = (i: number) => ({ animationDelay: `calc(var(--stagger-step) * ${i})` })
 
 // ---------- 卡内点色即改 ----------
 
@@ -225,20 +216,18 @@ async function submitCreate(): Promise<void> {
           v-for="(t, i) in filtered"
           :key="t.tag"
           class="tag-card"
-          :class="{ 'card-in': play(i) }"
-          :style="cardStyle(t.tag, i)"
+          :class="[`tag-pair-${colorIndex(t.tag)}`, { 'card-in': play(i) }]"
+          :style="play(i) ? delay(i) : undefined"
         >
-          <div class="card-head">
-            <h3 class="card-name">
-              <RouterLink :to="`/tags/${encodeURIComponent(t.tag)}`" class="card-link">
-                {{ t.tag }}
-              </RouterLink>
-            </h3>
-            <p class="card-meta">
-              <span v-if="t.count === 0" class="card-badge">未使用</span>
-              <span v-else class="card-count">{{ t.count }} 条</span>
-            </p>
-          </div>
+          <h3 class="card-name">
+            <RouterLink :to="`/tags/${encodeURIComponent(t.tag)}`" class="card-link">
+              {{ t.tag }}
+            </RouterLink>
+          </h3>
+          <p class="card-meta">
+            <span v-if="t.count === 0" class="card-badge">未使用</span>
+            <span v-else class="card-count">{{ t.count }} 条</span>
+          </p>
           <TagPalette
             class="card-palette"
             :model-value="colorIndex(t.tag)"
@@ -398,33 +387,26 @@ async function submitCreate(): Promise<void> {
   color: var(--color-danger);
 }
 
-/* 中性色卡（v1.1 迭代④）：卡体回归 surface + 1px 边框（列表行同族），颜色身份由
-   左彩条（--card-accent 指向 --tag-N-c）与色名着色承担——全染洗底在深色下发闷、
-   浅色致视觉疲劳，退场 */
+/* 全染色卡（v1.1 迭代⑤按用户决定回退至方案 A 原设计）：底色/文字色来自 tokens.css
+   的 .tag-pair-N 全局应用类（scoped 不设 background/color）；文字色经继承覆盖卡内
+   全部子元素 */
 .tag-card {
+  --swatch-ring-gap: transparent; /* 选中脉冲环缺口透出卡体洗底 */
   position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-left: 3px solid var(--card-accent);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
   transition: transform var(--duration-fast) var(--ease-out),
     box-shadow var(--duration-fast) var(--ease-out);
 }
 
+/* hover 与 TagBadge 同策略：叠加 --tag-hover-overlay 强化洗底 + 轻浮起 */
 .tag-card:hover {
   transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
-}
-
-/* 两段式卡面：信息行（名称左·元信息右）+ 控制区（托盘色板） */
-.card-head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
+  background-image: linear-gradient(var(--tag-hover-overlay), var(--tag-hover-overlay));
 }
 
 .card-name {
@@ -432,14 +414,12 @@ async function submitCreate(): Promise<void> {
   font-size: var(--text-md);
   font-weight: 600;
   overflow-wrap: anywhere;
-  flex: 1;
-  min-width: 0;
 }
 
-/* 色名着当前强调色；整卡可点（NoteList stretched-link 同配方）：名称链接伪元素
-   铺满整卡，色板按钮定位提升保持浮在拉伸层之上（DOM 在后 + z 抬升） */
+/* 整卡可点（NoteList stretched-link 同配方）：名称链接伪元素铺满整卡，
+   色板按钮定位提升保持浮在拉伸层之上（DOM 在后 + z 抬升） */
 .card-link {
-  color: var(--card-accent);
+  color: inherit;
   text-decoration: none;
 }
 
@@ -459,12 +439,12 @@ async function submitCreate(): Promise<void> {
   outline-offset: 2px;
 }
 
+/* 色板行：迷你胶囊 2×4 网格直接躺在卡面上（无托盘），pulse 选中环缺口透出卡体底色 */
 .card-meta {
   margin: 0;
   display: flex;
   align-items: center;
-  gap: var(--space-1);
-  flex-shrink: 0;
+  gap: var(--space-2);
   font-size: var(--text-xs);
 }
 
@@ -481,19 +461,11 @@ async function submitCreate(): Promise<void> {
   line-height: 1.6;
 }
 
-/* 控制区托盘：surface-2 底胶囊在中性卡上形成凹槽层次，饱和色点（.tag-dot-N）其上
-   高辨识；点距均分铺满 */
+/* 色板行：色点直接排布于洗底（v1.1 迭代⑤回退方案 A 原设计），pulse 选中环缺口透出洗底 */
 .card-palette {
   position: relative;
   z-index: var(--z-rail);
   margin-top: auto;
-  display: flex;
-  justify-content: space-between;
-  width: 100%;
-  padding: 6px 10px;
-  background: var(--color-surface-2);
-  --swatch-ring-gap: var(--color-surface-2);
-  border-radius: var(--radius-full);
 }
 
 /* 幽灵新建卡：虚线占位 → 点击原位展开表单 */
