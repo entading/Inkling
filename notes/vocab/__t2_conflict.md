@@ -2,7 +2,7 @@
 title: T2 冲突占位
 created: 2026-09-01
 updated: 2026-09-01
-tags: [__t2_probe]
+tags: [__t2_probe2]
 ---
 
 冲突占位正文。携带 __t2_b 用于重命名 409（撞词条已有标签）分支。
