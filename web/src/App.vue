@@ -139,11 +139,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
 
 .sidebar {
   position: sticky;
-  top: 0;
+  /* 吸附点/高度与 body 8px 浮卡边距协调（UX 打磨修复）：top 8px 保持浮卡边距视觉，
+     高度扣除上下边距（8×2）——100vh 直用会底部溢出视口 8px 且滚到底被父容器拖出视口顶（跳动） */
+  top: var(--space-2);
   align-self: flex-start;
   width: var(--sidebar-width);
   flex-shrink: 0;
-  height: 100vh;
+  height: calc(100vh - var(--space-4));
   padding: var(--space-6) var(--space-4);
   border-right: 1px solid var(--color-border);
   background: var(--color-surface);
@@ -344,8 +346,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
   }
 
   .content {
-    /* 底部余量 = 底导 72px + FAB 顶缘（120px）+ 16px 防遮挡（M5'）+ 安全区 */
-    padding: var(--space-4) var(--space-5) calc(136px + env(safe-area-inset-bottom));
+    /* 底部余量 = 底导 72px + FAB 顶缘（120px）+ 16px 防遮挡（M5'）+ 安全区；
+       左右 16px（UX 打磨，原 24）：移动端正文列增宽 */
+    padding: var(--space-4) var(--space-4) calc(136px + env(safe-area-inset-bottom));
   }
 
   .bottom-nav {
