@@ -1,6 +1,6 @@
 ---
 title: t2 quoted
-tags: ['keep two', __t2r_b]
+tags: ['keep two']
 ---
 
 引号项测试。
