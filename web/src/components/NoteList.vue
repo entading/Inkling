@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import EmptyState from './EmptyState.vue'
 import TagBadge from './TagBadge.vue'
@@ -8,11 +9,37 @@ import type { NoteMeta } from '../api'
 defineProps<{ notes: NoteMeta[] }>()
 
 // ---------- 入场 stagger（§6）----------
-// 本组件无状态：前 STAGGER_CAP 行携带 row-in 类与递增内联 delay；是否真正播放由
+// 前 STAGGER_CAP 行携带 row-in 类与递增内联 delay；是否真正播放由
 // 祖先 .stagger-arm（视图数据就绪后的入场窗口，见 lib/stagger.ts）门控——导航入场
 // 播一次波浪，页内过滤/标签重组重建列表时祖先类已摘除，零重播。
 const play = (i: number) => i < STAGGER_CAP
 const delay = (i: number) => ({ animationDelay: `calc(var(--stagger-step) * ${i})` })
+
+// ---------- 行内标签溢出展开（UX 迭代：列表行只显示前 3 个标签的「+N」接龙） ----------
+// 展开态给 .note-row 挂 tags-expanded 类启用换行（桌面 row-side 默认 nowrap+shrink:0，
+// 徽章超宽会顶出卡外，见实施记录），收起后还原。筛选重建列表时展开态随之复位。
+const expandedRows = ref<Set<string>>(new Set())
+
+function rowKey(note: NoteMeta): string {
+  return `${note.board}/${note.slug}`
+}
+
+function isExpanded(note: NoteMeta): boolean {
+  return expandedRows.value.has(rowKey(note))
+}
+
+function toggleTags(note: NoteMeta): void {
+  const key = rowKey(note)
+  const next = new Set(expandedRows.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  expandedRows.value = next
+}
+
+function visibleTags(note: NoteMeta): string[] {
+  return isExpanded(note) ? note.tags : note.tags.slice(0, 3)
+}
+
 </script>
 
 <template>
@@ -23,8 +50,8 @@ const delay = (i: number) => ({ animationDelay: `calc(var(--stagger-step) * ${i}
       :class="{ 'row-in': play(i) }"
       :style="play(i) ? delay(i) : undefined"
     >
-      <!-- 行内标题与标签均为独立链接，避免 <a> 嵌套 -->
-      <div class="note-row">
+      <!-- 行内标题与标签均为独立链接，避免 <a> 嵌套；tags-expanded 启用换行承接溢出徽章 -->
+      <div class="note-row" :class="{ 'tags-expanded': isExpanded(note) }">
         <RouterLink
           :to="`/v/${note.board}/${encodeURIComponent(note.slug)}`"
           class="row-main row-title-link"
@@ -35,7 +62,17 @@ const delay = (i: number) => ({ animationDelay: `calc(var(--stagger-step) * ${i}
         </RouterLink>
         <div class="row-side">
           <span class="row-board">{{ note.board === 'sentence' ? '长难句' : note.board === 'grammar' ? '语法' : note.board === 'phrase' ? '短语' : '词汇' }}</span>
-          <TagBadge v-for="tag in note.tags.slice(0, 3)" :key="tag" :tag="tag" />
+          <TagBadge v-for="tag in visibleTags(note)" :key="tag" :tag="tag" />
+          <button
+            v-if="note.tags.length > 3"
+            type="button"
+            class="tags-toggle"
+            :aria-expanded="isExpanded(note)"
+            :aria-label="isExpanded(note) ? '收起标签' : `显示其余 ${note.tags.length - 3} 个标签`"
+            @click.stop="toggleTags(note)"
+          >
+            {{ isExpanded(note) ? '收起' : `+${note.tags.length - 3}` }}
+          </button>
           <span class="row-updated">{{ note.updated }}</span>
         </div>
       </div>
@@ -168,6 +205,47 @@ const delay = (i: number) => ({ animationDelay: `calc(var(--stagger-step) * ${i}
   font-variant-numeric: tabular-nums;
 }
 
+/* 标签溢出指示器：中性 ghost 胶囊（与彩色 TagBadge 区分身份）；position:relative
+   浮于拉伸层之上（同 .tag-badge），点击开合不触发整行导航 */
+.tags-toggle {
+  position: relative;
+  padding: 1px 8px;
+  font-size: var(--text-xs);
+  font-family: inherit;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.tags-toggle:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.tags-toggle:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* 展开态换行补丁（防溢出）：桌面 .row-side 默认 nowrap + shrink:0，徽章超宽会
+   顶出卡外（实测 scrollWidth 815 > 670）——展开时启用换行，徽章接龙换到副行，
+   移动端媒体查询本已有同款规则 */
+.note-row.tags-expanded {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.note-row.tags-expanded .row-side {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
 .empty-cta {
   padding: var(--space-2) var(--space-4);
   font-size: var(--text-base);
@@ -216,6 +294,14 @@ const delay = (i: number) => ({ animationDelay: `calc(var(--stagger-step) * ${i}
     /* flex-shrink:0 的 flex item 按 max-content 计宽，3 个长标签时超出视口；
     封顶后 flex-wrap 才会生效改为换行 */
     max-width: 100%;
+  }
+
+  /* 长标签防溢出（迭代⑧展开功能压力测试发现，亦为既有问题）：单枚 32 字上限
+  徽章自身宽于窄视口——允许徽章内折行（短标签单行照旧）；完整名称在详情页可看 */
+  .row-side :deep(.tag-badge) {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }
 </style>
