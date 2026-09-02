@@ -392,16 +392,19 @@ watch(() => props.body, hidePreview)
   scroll-margin-top: var(--space-6);
 }
 
-/* h3 与正文同字号、靠加粗分层（阶梯内无 1.05 的档位，映射见实施记录） */
+/* h3 分节标题升档（UX 打磨，用户拍板推翻 M2' 同字号决策）：1.12em 相对正文缩放
+   （桌面 19px / 移动 17px，双端层级比恒定故用 em 而非固定令牌）；上边距加大强化分节呼吸 */
 .note-body :deep(h3) {
-  font-size: var(--text-body);
+  font-size: 1.12em;
+  font-weight: 700;
+  margin: 1.6em 0 0.5em;
   text-wrap: balance;
   letter-spacing: normal;
   scroll-margin-top: var(--space-6);
 }
 
 .note-body :deep(p) {
-  margin: 0.9em 0;
+  margin: 1.05em 0;
   text-wrap: pretty;
 }
 
@@ -649,7 +652,28 @@ watch(() => props.body, hidePreview)
 
 @media (max-width: 767px) {
   .note-body {
-    font-size: var(--text-base);
+    /* 16px（UX 打磨，用户拍板）：较 --text-base 略微放大，每行 ~18 字；
+       h3 的 1.12em 相对缩放自动跟随，层级比恒定 */
+    font-size: var(--text-md);
+  }
+
+  /* 表格（UX 打磨 v2）：「按词折行 + min-width 保底 + 字号降档」——
+     撤 nowrap（总宽 901px 滑距过长）也撤 anywhere 逐字折（竖排碎字元凶）：
+     英文按词折完整、中文按字折但列有 12em 保底（@xs 字号 ≈150px）——
+     行数较 8em 减半（5→3 行）、词组每行 2-3 个；总宽 ~450px 滑距百余像素，
+     超宽仍由 table 自身内滚兜底 */
+  .note-body :deep(th),
+  .note-body :deep(td) {
+    white-space: normal;
+    overflow-wrap: normal;
+    min-width: 12em;
+    padding: var(--space-3);
+  }
+
+  .note-body :deep(table) {
+    /* --text-sm 14.08px（UX 打磨，用户拍板自 --text-xs 上调）：与 16px 正文的落差收敛；
+       代价是列宽保底（12em）与总宽等比放大，滑距 ~163→220px，内滚兜底 */
+    font-size: var(--text-sm);
   }
 }
 </style>

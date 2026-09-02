@@ -85,14 +85,14 @@ function scrollTo(key: string) {
   align-self: flex-start;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   padding-right: var(--space-2);
   border-right: 1px solid var(--color-border);
 }
 
 .az-letter {
   width: 24px;
-  padding: 2px 0;
+  padding: 1px 0;
   font-size: var(--text-xs);
   font-family: inherit;
   color: var(--color-accent);

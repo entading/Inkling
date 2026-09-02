@@ -1116,12 +1116,14 @@ async function refreshMissingLinks(): Promise<void> {
 }
 
 @media (max-width: 767px) {
+  /* 左右收窄至 12px（UX 打磨）：375 视口下正文列 255→~300px；
+     上下保持 16px 呼吸。骨架同 padding 贴合真实文本 */
   .note {
-    padding: 20px;
+    padding: var(--space-4) var(--space-3);
   }
 
   .note-skeleton {
-    padding: 20px;
+    padding: var(--space-4) var(--space-3);
   }
 
   .note-title {

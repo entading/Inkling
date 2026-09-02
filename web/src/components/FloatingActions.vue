@@ -17,7 +17,8 @@ function updateShowTop(): void {
   if (raf) return
   raf = window.requestAnimationFrame(() => {
     raf = 0
-    showTop.value = window.scrollY > 600
+    // 阈值 300px（UX 打磨，原 600）：当前内容规模下全站最长可滚 492px，600 永远无法触发
+    showTop.value = window.scrollY > 300
   })
 }
 
@@ -39,7 +40,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <!-- 回顶：滚动 >600px 出现，桌面与移动端都有 -->
+  <!-- 回顶：滚动 >300px 出现，桌面与移动端都有 -->
   <Transition name="pop">
     <button
       v-if="showTop"
@@ -66,8 +67,8 @@ onBeforeUnmount(() => {
   z-index: var(--z-nav);
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   color: var(--color-text-secondary);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
