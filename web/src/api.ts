@@ -54,6 +54,31 @@ export interface TagRegistryEntry {
 /** 标签注册表：键 = 标签名，持久化于服务端 data/tags.json */
 export type TagRegistry = Record<string, TagRegistryEntry>
 
+/** 标签管理操作涉及的词条引用（v1.1 T2） */
+export interface TagNoteRef {
+  board: string
+  slug: string
+}
+
+/** 手术无法安全定位/读写的词条：跳过并如实上报（部分成功语义） */
+export interface TagWarning extends TagNoteRef {
+  reason: string
+}
+
+/** 深度删除响应：removedFrom = 实际移除了标签项的词条 */
+export interface TagDeleteResult {
+  registry: TagRegistry
+  removedFrom: TagNoteRef[]
+  warnings: TagWarning[]
+}
+
+/** 重命名响应：renamedNotes = 实际同步改名的词条 */
+export interface TagRenameResult {
+  registry: TagRegistry
+  renamedNotes: TagNoteRef[]
+  warnings: TagWarning[]
+}
+
 /** API 错误：message 为服务端 error 字段，status 供调用方区分（如新建 409 冲突） */
 export class ApiError extends Error {
   status: number
@@ -115,5 +140,15 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tag, color }),
+    }),
+  /** 深度删除：注册表条目 + 全部携带词条的标签项一并移除（v1.1 T2） */
+  deleteTag: (tag: string) =>
+    fetchJson<TagDeleteResult>(`/api/tags/${encodeURIComponent(tag)}`, { method: 'DELETE' }),
+  /** 重命名：注册表键改名 + 携带词条同步替换（v1.1 T2） */
+  renameTag: (tag: string, newTag: string) =>
+    fetchJson<TagRenameResult>(`/api/tags/${encodeURIComponent(tag)}/rename`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newTag }),
     }),
 }

@@ -241,3 +241,15 @@ export function removeNote(board: Board, slug: string): void {
   fs.rmSync(filePath)
   index.get(board)?.delete(slug)
 }
+
+/** 词条文件绝对路径（经索引定位，子目录词条安全）；不在索引时返回 null（v1.1 T2 标签手术用） */
+export function noteFilePath(board: Board, slug: string): string | null {
+  const note = index.get(board)?.get(slug)
+  if (!note) return null
+  return path.join(NOTES_DIR, note.filePath)
+}
+
+/** 外部（标签手术）改写词条文件后立即重索引——不等 chokidar 的 awaitWriteFinish 窗口 */
+export function reindexNote(filePath: string): void {
+  upsert(filePath)
+}
