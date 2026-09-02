@@ -1,7 +1,7 @@
 ---
 title: T2 Flow 裸项
 created: 2026-09-01
-tags: ["__t2 新名,带引号", keep1, 动词]
+tags: [keep1, 动词]
 source: t2 手术测试
 ---
 
