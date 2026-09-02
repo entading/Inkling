@@ -15,8 +15,9 @@ export function tagPairIndex(tag: string): number {
 /**
  * 取色解析（v1.1 标签实体化）：注册表优先（人工指定色），未命中回落 djb2 稳定 hash。
  * 读 shallowRef 镜像，在 computed 中使用即获响应式——注册表就绪/改色后全站自动重上色。
+ * 查询键做 NFC 规范化（B4）：笔记标签若为 NFD 分解形式也能命中 NFC 键的注册表条目。
  */
 export function tagColorIndex(tag: string): number {
-  const entry = tagRegistryRef.value[tag]
+  const entry = tagRegistryRef.value[tag.normalize('NFC')]
   return entry ? entry.color : tagPairIndex(tag)
 }

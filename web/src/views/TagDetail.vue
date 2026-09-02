@@ -4,8 +4,7 @@ import { useRoute } from 'vue-router'
 import NoteList from '../components/NoteList.vue'
 import TagPalette from '../components/TagPalette.vue'
 import { BOARD_LABELS, BOARD_ORDER, getSearchIndex } from '../lib/search'
-import { api } from '../api'
-import { applyTagRegistry } from '../lib/tagRegistry'
+import { upsertTag } from '../lib/tagRegistry'
 import { tagColorIndex } from '../lib/tagColor'
 import type { NoteDetail } from '../api'
 import { useStaggerArm } from '../lib/stagger'
@@ -58,8 +57,7 @@ async function recolor(color: number): Promise<void> {
   recoloring.value = true
   recolorError.value = ''
   try {
-    const reg = await api.upsertTag(tag.value, color)
-    applyTagRegistry(reg)
+    await upsertTag(tag.value, color)
   } catch (e) {
     recolorError.value = `改色失败：${e instanceof Error ? e.message : String(e)}`
   } finally {

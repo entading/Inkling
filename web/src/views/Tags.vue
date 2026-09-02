@@ -2,8 +2,7 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { aggregateTags, type TagCount } from '../lib/search'
-import { api } from '../api'
-import { tagRegistryRef, getTagRegistry, applyTagRegistry } from '../lib/tagRegistry'
+import { tagRegistryRef, getTagRegistry, upsertTag } from '../lib/tagRegistry'
 import { tagColorIndex } from '../lib/tagColor'
 import EmptyState from '../components/EmptyState.vue'
 import TagPalette from '../components/TagPalette.vue'
@@ -100,22 +99,21 @@ function cardStyle(tag: string, i: number): Record<string, string> {
   return style
 }
 
-// ---------- 卡内点色即改 ----------
+// ---------- 卡内点色即改（B6：per-tag 锁——跨卡可并发，序列号守卫在 lib 层兜底乱序） ----------
 
-const recoloring = ref(false)
+const pendingTags = ref<string[]>([])
 const recolorError = ref('')
 
 async function recolor(tag: string, color: number): Promise<void> {
-  if (recoloring.value) return
-  recoloring.value = true
+  if (pendingTags.value.includes(tag)) return
+  pendingTags.value = [...pendingTags.value, tag]
   recolorError.value = ''
   try {
-    const reg = await api.upsertTag(tag, color)
-    applyTagRegistry(reg)
+    await upsertTag(tag, color)
   } catch (e) {
     recolorError.value = `「${tag}」改色失败：${e instanceof Error ? e.message : String(e)}`
   } finally {
-    recoloring.value = false
+    pendingTags.value = pendingTags.value.filter((t) => t !== tag)
   }
 }
 
@@ -156,9 +154,8 @@ async function submitCreate(): Promise<void> {
   }
   pending.value = true
   try {
-    const reg = await api.upsertTag(tag, newColor.value)
-    applyTagRegistry(reg)
     // 成功反馈 = 墙内新卡出现 / 既有卡即时换色；清筛选保证新卡可见
+    await upsertTag(tag, newColor.value)
     filter.value = ''
     closeCreate()
   } catch (e) {

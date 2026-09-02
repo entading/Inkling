@@ -47,11 +47,14 @@ export function getTagRegistry(): TagRegistry {
 
 /**
  * upsert：已存在仅更新 color（保留 created）；不存在创建（created = 当天本地日期）。
+ * 键做 NFC 规范化（规范等价，视觉零变化）——堵 NFD/NFC 重复键的洞；大小写保持
+ * 敏感（与笔记 frontmatter 标签语义一致，静默小写会改变用户输入并破坏颜色绑定）。
  * 先写盘后改内存：写盘失败向上抛（路由转 500），内存保持与磁盘一致。
  */
 export function upsertTag(tag: string, color: number): TagRegistry {
+  const key = tag.normalize('NFC')
   const next: TagRegistry = { ...registry }
-  next[tag] = { color, created: next[tag]?.created ?? dateOfLocal(new Date()) }
+  next[key] = { color, created: next[key]?.created ?? dateOfLocal(new Date()) }
   persist(next)
   registry = next
   return registry
