@@ -1,4 +1,6 @@
 import type { FastifyInstance } from 'fastify'
+import fs from 'node:fs'
+import path from 'node:path'
 import { BOARDS, type Board } from './types.js'
 import {
   boardCounts,
@@ -9,11 +11,14 @@ import {
   allNotesWithBody,
   writeNote,
   removeNote,
+  noteFilePath,
+  NOTES_DIR,
 } from './scanner.js'
 import { buildTemplate } from './templates.js'
 import { LAN_STATE, buildServerInfo } from './settings.js'
-import { commitNoteDeletion } from './gitCommit.js'
-import { getTagRegistry, upsertTag } from './tagRegistry.js'
+import { commitNoteDeletion, commitNotesBatch } from './gitCommit.js'
+import { getTagRegistry, upsertTag, removeTagFromRegistry, renameTagInRegistry } from './tagRegistry.js'
+import { surgeryNoteFile } from './tagSurgery.js'
 
 /** 由 index.ts 注入：请求切换局域网监听（后台执行，先应答后 close→re-listen） */
 export interface ServerHooks {
@@ -42,6 +47,68 @@ const WINDOWS_RESERVED = new Set([
   ...Array.from({ length: 9 }, (_, i) => `COM${i + 1}`),
   ...Array.from({ length: 9 }, (_, i) => `LPT${i + 1}`),
 ])
+
+// —— 标签管理（v1.1 T2）共用小工具 ————————————————————————————————
+
+const nfc = (s: string) => s.normalize('NFC')
+
+/** 词条是否携带某标签（NFC 归一化比较，与注册表键/tagColorIndex 查询口径一致） */
+function carriesTag(tags: string[], tagNfc: string): boolean {
+  return tags.some((t) => t.normalize('NFC') === tagNfc)
+}
+
+/** `next[key] = ...` 对 __proto__ 会写原型而非自有键（JSON 落盘静默丢条目），直接拒绝 */
+function isUnsafeTagName(tag: string): boolean {
+  return tag === '__proto__'
+}
+
+function hasOwnTag(reg: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(reg, key)
+}
+
+/** 项目根（git 工作目录）：notes/ 上一级 */
+const PROJECT_ROOT = path.resolve(NOTES_DIR, '..')
+
+/** 手术改写文件的 git 相对路径（posix 分隔符，供精确 git add） */
+function relForGit(absPath: string): string {
+  return path.relative(PROJECT_ROOT, absPath).replace(/\\/g, '/')
+}
+
+interface TagOpWarning {
+  board: string
+  slug: string
+  reason: string
+}
+
+/**
+ * 对影响面词条逐个执行 frontmatter 手术：无法安全定位/读写 → 跳过并计入 warnings
+ * （部分成功如实上报），成功者即时重索引并收集 git 精确提交路径。
+ */
+function operateAffectedNotes(
+  affected: Array<{ board: Board; slug: string }>,
+  targetNfc: string,
+  mode: 'remove' | 'rename',
+  replacement: string,
+): { done: Array<{ board: string; slug: string }>; warnings: TagOpWarning[]; changedRel: string[] } {
+  const done: Array<{ board: string; slug: string }> = []
+  const warnings: TagOpWarning[] = []
+  const changedRel: string[] = []
+  for (const n of affected) {
+    const abs = noteFilePath(n.board, n.slug)
+    if (!abs) {
+      warnings.push({ board: n.board, slug: n.slug, reason: '索引中找不到词条文件路径' })
+      continue
+    }
+    const res = surgeryNoteFile(abs, targetNfc, mode, replacement)
+    if (res.ok) {
+      done.push({ board: n.board, slug: n.slug })
+      changedRel.push(relForGit(abs))
+    } else {
+      warnings.push({ board: n.board, slug: n.slug, reason: res.reason })
+    }
+  }
+  return { done, warnings, changedRel }
+}
 
 /** 写盘专用：在 isSafeSlug 基础上补 Windows 保留名与结尾点/空格（写这类文件名抛 EINVAL） */
 function isWritableSlug(value: string): boolean {
@@ -145,6 +212,83 @@ export function registerRoutes(app: FastifyInstance, hooks?: ServerHooks): void 
       return reply.code(500).send({ error: `写入失败：${err instanceof Error ? err.message : String(err)}` })
     }
     return getTagRegistry()
+  })
+
+  // 标签深度删除（v1.1 T2）：注册表条目 + 全部携带词条 frontmatter 中的对应标签项一并移除。
+  // 无法安全手术的文件跳过并计入 warnings（部分成功如实上报）；全部先落盘、注册表最后移除
+  // （注册表写失败 500 时内存未变，重试路径收敛）。
+  app.delete('/api/tags/:tag', async (req, reply) => {
+    const tagNfc = nfc(String((req.params as { tag?: string }).tag ?? ''))
+    if (!tagNfc) return reply.code(404).send({ error: '标签不存在' })
+    if (isUnsafeTagName(tagNfc)) return reply.code(400).send({ error: '标签名不合法' })
+    const registry = getTagRegistry()
+    const inRegistry = hasOwnTag(registry, tagNfc)
+    const affected = allNotes().filter((n) => carriesTag(n.tags, tagNfc))
+    if (!inRegistry && affected.length === 0) {
+      return reply.code(404).send({ error: `标签不存在：${tagNfc}` })
+    }
+    const { done, warnings, changedRel } = operateAffectedNotes(affected, tagNfc, 'remove', '')
+    if (inRegistry) {
+      try {
+        removeTagFromRegistry(tagNfc)
+      } catch (err) {
+        req.log.error(err)
+        return reply.code(500).send({ error: `注册表写入失败：${err instanceof Error ? err.message : String(err)}` })
+      }
+    }
+    if (changedRel.length > 0) {
+      commitNotesBatch(`note: 删除标签「${tagNfc}」（${done.length} 个词条移除）`, changedRel)
+    }
+    return { registry: getTagRegistry(), removedFrom: done, warnings }
+  })
+
+  // 标签重命名（v1.1 T2）：注册表键改名（color/created 保留）+ 全部携带词条同步替换。
+  // 409 = 新名（NFC）已存在于注册表或任一词条；写入词条的是 NFC 形式新名（注册表键同源）。
+  app.post('/api/tags/:tag/rename', async (req, reply) => {
+    const oldNfc = nfc(String((req.params as { tag?: string }).tag ?? ''))
+    if (!oldNfc) return reply.code(404).send({ error: '标签不存在' })
+    if (isUnsafeTagName(oldNfc)) return reply.code(400).send({ error: '标签名不合法' })
+    const body = req.body as { newTag?: unknown } | null | undefined
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'body 必须为 { newTag: string } 对象' })
+    }
+    if (typeof body.newTag !== 'string') {
+      return reply.code(400).send({ error: 'newTag 必须为字符串' })
+    }
+    const newRaw = body.newTag.trim()
+    if (!newRaw) return reply.code(400).send({ error: 'newTag 不能为空白' })
+    if (newRaw.length > 32) return reply.code(400).send({ error: 'newTag 不能超过 32 字符' })
+    const newNfc = nfc(newRaw)
+    if (isUnsafeTagName(newNfc)) return reply.code(400).send({ error: '标签名不合法' })
+    if (newNfc === oldNfc) return reply.code(400).send({ error: '新名称与旧名称相同' })
+
+    const registry = getTagRegistry()
+    const oldInRegistry = hasOwnTag(registry, oldNfc)
+    const affected = allNotes().filter((n) => carriesTag(n.tags, oldNfc))
+    if (!oldInRegistry && affected.length === 0) {
+      return reply.code(404).send({ error: `标签不存在：${oldNfc}` })
+    }
+    if (hasOwnTag(registry, newNfc)) {
+      return reply.code(409).send({ error: `注册表中已存在标签「${newNfc}」，合并请手工进行` })
+    }
+    const conflict = allNotes().find((n) => carriesTag(n.tags, newNfc))
+    if (conflict) {
+      return reply.code(409).send({ error: `词条 ${conflict.board}/${conflict.slug} 已携带标签「${newNfc}」，合并请手工进行` })
+    }
+
+    const { done, warnings, changedRel } = operateAffectedNotes(affected, oldNfc, 'rename', newNfc)
+    if (oldInRegistry) {
+      try {
+        renameTagInRegistry(oldNfc, newNfc)
+      } catch (err) {
+        req.log.error(err)
+        return reply.code(500).send({ error: `注册表写入失败：${err instanceof Error ? err.message : String(err)}` })
+      }
+    }
+    if (changedRel.length > 0) {
+      commitNotesBatch(`note: 标签重命名「${oldNfc}」→「${newNfc}」（${done.length} 个词条同步）`, changedRel)
+    }
+    return { registry: getTagRegistry(), renamedNotes: done, warnings }
   })
 
   app.post('/api/notes', async (req, reply) => {

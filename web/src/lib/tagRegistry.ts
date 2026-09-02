@@ -1,5 +1,6 @@
 import { shallowRef } from 'vue'
 import { api, type TagRegistry } from '../api'
+import { invalidateSearchIndex } from './search'
 
 /**
  * 标签注册表客户端缓存（v1.1）：Promise 缓存照 getSearchIndex 模式；额外维护
@@ -7,9 +8,9 @@ import { api, type TagRegistry } from '../api'
  * 失效重载/upsert 后整体替换 .value，依赖它的 computed 自动重算完成全站重上色
  * （MarkdownViewer linkVersion 同款思路）。
  *
- * 一致性守卫（全面审查 B2/B6 定稿）：mutationSeq 每次 upsert 调用递增——
- * - upsert 响应仅在自己是最新一次调用时应用（乱序返回的过期快照直接丢弃）；
- * - GET 发起时记录快照，期间若发生过 upsert 则响应不覆盖 ref（预载竞态根治）。
+ * 一致性守卫（全面审查 B2/B6 定稿）：mutationSeq 每次写操作调用递增——
+ * - 写响应仅在自己是最新一次调用时应用（乱序返回的过期快照直接丢弃）；
+ * - GET 发起时记录快照，期间若发生过写操作则响应不覆盖 ref（预载竞态根治）。
  */
 
 export const tagRegistryRef = shallowRef<TagRegistry>({})
@@ -54,6 +55,35 @@ export async function upsertTag(tag: string, color: number): Promise<TagRegistry
     broadcast()
   }
   return reg
+}
+
+/**
+ * 深度删除（v1.1 T2）：注册表条目 + 全部携带词条的标签项一并移除。注册表应用走
+ * 序列号守卫（同 upsert）；词条已变更的事实不受守卫影响——invalidateSearchIndex
+ * 无条件调用（invalidateSearchIndex 全站第 4 处调用点：新建/编辑/删除词条 + 此处
+ * 与 renameTag），下次 getSearchIndex() 自动重拉，色卡墙/列表徽章/搜索三处同步。
+ */
+export async function deleteTag(tag: string): Promise<ReturnType<typeof api.deleteTag>> {
+  const seq = ++mutationSeq
+  const res = await api.deleteTag(tag)
+  if (seq === mutationSeq) {
+    apply(res.registry)
+    broadcast()
+  }
+  invalidateSearchIndex()
+  return res
+}
+
+/** 重命名（v1.1 T2）：语义同 deleteTag——注册表守卫应用 + 搜索索引无条件失效 */
+export async function renameTag(tag: string, newTag: string): Promise<ReturnType<typeof api.renameTag>> {
+  const seq = ++mutationSeq
+  const res = await api.renameTag(tag, newTag)
+  if (seq === mutationSeq) {
+    apply(res.registry)
+    broadcast()
+  }
+  invalidateSearchIndex()
+  return res
 }
 
 // —— 跨页签/跨设备同步（全面审查 B3 定稿，轻量方案）：

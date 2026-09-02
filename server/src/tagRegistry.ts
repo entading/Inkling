@@ -59,3 +59,32 @@ export function upsertTag(tag: string, color: number): TagRegistry {
   registry = next
   return registry
 }
+
+/**
+ * 移除注册表条目（v1.1 T2 深度删除的注册表侧）；不存在的键幂等返回现表。
+ * 键必须为 NFC 形式（路由层归一）；判存走 hasOwnProperty（防原型链误判）。
+ * 先写盘后改内存：写盘失败向上抛（路由转 500），内存保持与磁盘一致。
+ */
+export function removeTagFromRegistry(tagNfc: string): TagRegistry {
+  if (!Object.prototype.hasOwnProperty.call(registry, tagNfc)) return registry
+  const next: TagRegistry = { ...registry }
+  delete next[tagNfc]
+  persist(next)
+  registry = next
+  return registry
+}
+
+/**
+ * 注册表键改名（v1.1 T2 重命名的注册表侧）：color/created 原样保留；
+ * 旧键不存在幂等返回现表（路由层已做 404 判定，这里兜底）。先写盘后改内存。
+ */
+export function renameTagInRegistry(oldNfc: string, newNfc: string): TagRegistry {
+  if (!Object.prototype.hasOwnProperty.call(registry, oldNfc)) return registry
+  const entry = registry[oldNfc]
+  const next: TagRegistry = { ...registry }
+  delete next[oldNfc]
+  next[newNfc] = { color: entry.color, created: entry.created }
+  persist(next)
+  registry = next
+  return registry
+}

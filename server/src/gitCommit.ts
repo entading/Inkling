@@ -33,3 +33,29 @@ export function commitNoteDeletion(board: string, slug: string): void {
     console.warn(`git 自动提交调度失败：${err instanceof Error ? err.message : String(err)}`)
   }
 }
+
+/**
+ * 标签批量手术后自动 git 提交（v1.1 T2）：只 add 本次操作实际改写的文件（精确路径，
+ * posix 分隔符）——不用 `-A notes`，避免把用户未提交的其他笔记变更（如手改中的
+ * 词条）与验证期临时词条卷进自动提交；注册表 json 在 notes/ 外天然不入提交。
+ * 后台执行、不阻塞响应、失败仅 console.warn；空文件列表不提交。
+ */
+export function commitNotesBatch(message: string, relFiles: string[]): void {
+  if (relFiles.length === 0) return
+  try {
+    execFile('git', ['add', '--', ...relFiles], { cwd: PROJECT_ROOT }, (err) => {
+      if (err) {
+        if (err.code === 'ENOENT') return
+        console.warn(`git add 失败，跳过标签操作自动提交：${err.message}`)
+        return
+      }
+      execFile('git', ['commit', '-m', message], { cwd: PROJECT_ROOT }, (commitErr) => {
+        if (!commitErr) return
+        if (commitErr.code === 'ENOENT') return
+        console.warn(`git commit 失败（文件已改写，仅未提交）：${commitErr.message}`)
+      })
+    })
+  } catch (err) {
+    console.warn(`git 自动提交调度失败：${err instanceof Error ? err.message : String(err)}`)
+  }
+}
