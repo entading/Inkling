@@ -359,6 +359,7 @@ onMounted(load)
 }
 
 .track {
+  position: relative;
   display: block;
   width: 44px;
   height: 24px;
@@ -376,14 +377,15 @@ onMounted(load)
   border-radius: var(--radius-full);
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
-  transition: transform var(--duration-base) var(--ease-out);
+  transition: transform var(--duration-slow) var(--ease-spring);
 }
 
 .switch input:checked + .track {
   background: var(--color-accent);
 }
 
-.switch input:checked ~ .thumb {
+/* thumb 是 track 的子元素（非 input 兄弟）：选中态经 track 后代选择传导（修复白胶囊不滑动） */
+.switch input:checked + .track .thumb {
   transform: translateX(20px);
 }
 

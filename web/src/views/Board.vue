@@ -36,26 +36,9 @@ const indexError = ref('')
 // ---------- 筛选 / 排序 / 密度（M5'，§10）：route.query 为筛选态唯一事实来源 ----------
 
 type SortMode = 'alpha' | 'updated'
-type Density = 'cozy' | 'compact'
 
 const activeTags = ref<string[]>([])
 const sort = ref<SortMode | ''>('')
-const density = ref<Density>('cozy')
-
-try {
-  if (localStorage.getItem('en_tool:density') === 'compact') density.value = 'compact'
-} catch {
-  /* 存储不可用（隐私模式等）时用默认舒适档 */
-}
-
-function setDensity(d: Density): void {
-  density.value = d
-  try {
-    localStorage.setItem('en_tool:density', d)
-  } catch {
-    /* 同上 */
-  }
-}
 
 /** 当前板块标签聚合（tag→count，count 降序、同数按标签升序）。
  * 口径 = 仅词条携带的标签（笔记 frontmatter 聚合），不含注册表中 count=0 的标签——
@@ -128,6 +111,34 @@ const emptyTitle = computed(() => {
   return '没有符合所选标签的词条'
 })
 
+/** 板块排序记忆（UX 打磨）：en_tool:board-sort = { [board]: 'alpha' | 'updated' }。
+ * 显式 ?sort= 恒优先（分享链接 / 浏览器 back 语义不变）；无 query 时回落记忆，
+ * 使回到板块时保持该板块最后一次切换的排序。存储损坏/不可用静默降级为无记忆 */
+type SortMemory = Partial<Record<string, SortMode>>
+
+function readSortMemory(board: string): SortMode | '' {
+  try {
+    const raw = localStorage.getItem('en_tool:board-sort')
+    if (!raw) return ''
+    const map = JSON.parse(raw) as SortMemory
+    const v = map[board]
+    return v === 'alpha' || v === 'updated' ? v : ''
+  } catch {
+    return ''
+  }
+}
+
+function writeSortMemory(board: string, mode: SortMode): void {
+  try {
+    const raw = localStorage.getItem('en_tool:board-sort')
+    const map: SortMemory = raw ? JSON.parse(raw) : {}
+    map[board] = mode
+    localStorage.setItem('en_tool:board-sort', JSON.stringify(map))
+  } catch {
+    /* 同上 */
+  }
+}
+
 function syncFromRoute() {
   const q = route.query.q
   const ft = route.query.fulltext
@@ -136,7 +147,7 @@ function syncFromRoute() {
   query.value = typeof q === 'string' ? q : ''
   fulltext.value = ft === '1' || ft === 'true'
   activeTags.value = typeof t === 'string' && t ? t.split(',').filter(Boolean) : []
-  sort.value = s === 'alpha' || s === 'updated' ? s : ''
+  sort.value = s === 'alpha' || s === 'updated' ? s : readSortMemory(props.board)
   if (fulltext.value) void loadIndex()
 }
 
@@ -162,8 +173,10 @@ function toggleTag(tag: string): void {
   pushRouteQuery(tags, sort.value)
 }
 
-/** 点击当前生效序 = 清显式参数回默认（观感不变、URL 收敛）；点另一序 = 写显式参数 */
+/** 点击当前生效序 = 清显式参数回默认（观感不变、URL 收敛）；点另一序 = 写显式参数。
+ * 无论点哪个都写板块排序记忆（用户最后意愿），query 删除后由记忆接棒维持观感 */
 function setSort(mode: SortMode): void {
+  writeSortMemory(props.board, mode)
   pushRouteQuery(activeTags.value, mode === effectiveSort.value ? '' : mode)
 }
 
@@ -189,7 +202,7 @@ watch(() => route.query, syncFromRoute)
 <template>
   <div
     class="board-page"
-    :class="{ 'stagger-arm': staggerArm, 'density-compact': density === 'compact' }"
+    :class="{ 'stagger-arm': staggerArm }"
   >
     <header class="board-header">
       <h1 class="board-title">{{ boardLabels[board] }}</h1>
@@ -241,6 +254,11 @@ watch(() => route.query, syncFromRoute)
       </div>
       <div class="list-controls">
         <div class="seg" role="group" aria-label="排序方式">
+          <span
+            class="seg-thumb"
+            :class="{ 'seg-right': effectiveSort === 'updated' }"
+            aria-hidden="true"
+          ></span>
           <button
             type="button"
             class="fchip"
@@ -260,26 +278,6 @@ watch(() => route.query, syncFromRoute)
             最近更新
           </button>
         </div>
-        <div class="seg" role="group" aria-label="列表密度">
-          <button
-            type="button"
-            class="fchip"
-            :class="{ active: density === 'compact' }"
-            :aria-pressed="density === 'compact'"
-            @click="setDensity('compact')"
-          >
-            紧凑
-          </button>
-          <button
-            type="button"
-            class="fchip"
-            :class="{ active: density === 'cozy' }"
-            :aria-pressed="density === 'cozy'"
-            @click="setDensity('cozy')"
-          >
-            舒适
-          </button>
-        </div>
       </div>
     </div>
 
@@ -297,9 +295,15 @@ watch(() => route.query, syncFromRoute)
     >
       <button type="button" class="empty-clear" @click="clearAllFilters">清除全部筛选</button>
     </EmptyState>
-    <AZIndex v-else-if="board === 'vocab' && sort !== 'updated'" :notes="filtered" />
-    <!-- 词汇板显式选「最近更新」时切扁平列表：字母分组会重排updated 序使其不可见
-         （M5' 显隐决策，AZIndex 组件零改动） -->
+    <!-- 字母索引：词汇/短语板生效排序为字母序时显示；显式选「最近更新」切扁平列表——字母分组会重排
+         updated 序使排序不可见（M5' 显隐决策，AZIndex 组件零改动）。短语板索引为 UX 打磨轮新增
+         （用户拍板）；长难句/语法标题以中文/数字为主，字母索引无意义不开。
+         条件用 effectiveSort（生效排序）而非 sort 原始 ref——短语板无 query 时 sort 为空串、
+         生效排序是 updated，用 sort 会出现「滑块在右索引却在」的分叉 -->
+    <AZIndex
+      v-else-if="(board === 'vocab' || board === 'phrase') && effectiveSort !== 'updated'"
+      :notes="filtered"
+    />
     <NoteList v-else :notes="filtered" />
   </div>
 </template>
@@ -428,11 +432,12 @@ watch(() => route.query, syncFromRoute)
 /* 筛选行（M5' §10）：标签 chips OR 多选 + 右侧排序/密度段控件；fchip 与既有
    .chip（搜索框内 absolute 全文切换）命名区分，视觉同族 */
 .board-filters {
+  /* 标签行上、排序行下（UX 打磨：排序控件独立成行，不与标签争夺同一行）；
+     左对齐跟随内容阅读流 */
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-3);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
   margin-bottom: var(--space-6);
 }
 
@@ -468,18 +473,42 @@ watch(() => route.query, syncFromRoute)
   border-color: var(--color-accent);
 }
 
-/* 排序/密度分段控件：灰底轨道 + 活动段白底浮起（视图控制语言，与标签筛选项区分） */
+/* 排序/密度分段控件：灰底轨道 + 白底滑块（视图控制语言，与标签筛选项区分）。
+   等宽双格（grid 1fr 1fr）+ 滑块 translateX(0/100%)——滑块动画纯 CSS 表达，零 JS 测量 */
 .seg {
-  display: flex;
-  align-items: center;
-  gap: 2px;
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
   padding: 3px;
   background: var(--color-surface-2);
   border-radius: var(--radius-full);
 }
 
+/* 滑块：白底浮起层，随 active 侧 translateX 滑动（几何：left 3px + 宽 50%-3px
+   + 位移自身宽度 = 恰好落在右半格） */
+.seg-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-sm);
+}
+
+/* active 侧在右：位移自身宽度即落入右半格（left 3px + 宽 50%-3px + 50%-3px） */
+.seg-thumb.seg-right {
+  transform: translateX(100%);
+}
+
 .seg .fchip {
-  padding: 4px 14px;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  justify-content: center;
   background: transparent;
   border-color: transparent;
 }
@@ -490,11 +519,12 @@ watch(() => route.query, syncFromRoute)
   background: transparent;
 }
 
+/* 活动段的白底/边框/阴影由滑块层承担，文字保持 accent */
 .seg .fchip.active {
   color: var(--color-accent);
-  background: var(--color-surface);
-  border-color: var(--color-border);
-  box-shadow: var(--shadow-sm);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .fchip.active {
@@ -506,12 +536,6 @@ watch(() => route.query, syncFromRoute)
 .fchip-count {
   margin-left: var(--space-1);
   font-variant-numeric: tabular-nums;
-}
-
-/* 密度-紧凑（M5'）：仅覆盖行 padding 两档，NoteList 组件零改动（:deep 穿透；
-   AZIndex 分组内的列表同受根类作用） */
-.density-compact :deep(.note-row) {
-  padding: var(--space-2) var(--space-3);
 }
 
 .hint,
@@ -582,6 +606,11 @@ watch(() => route.query, syncFromRoute)
   /* chip 以 translateY(-50%) 垂直居中，:active 需组合保留否则按住时会跳位 */
   .chip:active {
     transform: translateY(-50%) scale(0.98);
+  }
+
+  /* 分段控件滑块滑动（UX 打磨）：回弹曲线，reduced-motion 直跳不动画 */
+  .seg-thumb {
+    transition: transform var(--duration-slow) var(--ease-spring);
   }
 }
 
