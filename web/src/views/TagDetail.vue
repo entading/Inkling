@@ -191,82 +191,83 @@ onMounted(async () => {
       <p class="page-meta">{{ total }} 条词条</p>
     </header>
 
-    <section class="recolor-block" aria-label="自定义颜色">
-      <span class="recolor-label">自定义颜色</span>
-      <TagPalette :model-value="currentColor" @select="recolor" />
-      <span v-if="recolorError" class="recolor-error" role="alert">{{ recolorError }}</span>
-    </section>
-
-    <!-- 管理区（T2）：索引加载成功才展示——索引失败时影响面清单不可信，
-         此时不提供删除/重命名入口（宁缺勿错删） -->
-    <section v-if="indexLoaded" class="manage-block" aria-label="标签管理">
-      <div class="manage-head">
-        <span class="manage-title">管理</span>
-        <div class="manage-actions">
-          <button
-            type="button"
-            class="manage-btn"
-            :class="{ active: panel === 'rename' }"
-            :aria-expanded="panel === 'rename'"
-            @click="togglePanel('rename')"
-          >
-            重命名
-          </button>
-          <button
-            type="button"
-            class="manage-btn is-danger"
-            :class="{ active: panel === 'delete' }"
-            :aria-expanded="panel === 'delete'"
-            @click="togglePanel('delete')"
-          >
-            删除标签
-          </button>
-        </div>
+    <!-- 设置卡（T2 收尾打磨）：取色与管理合并单卡，行间嵌线分隔（与 rename-panel 分隔线同语言）；
+         索引加载失败时只保留取色行、隐藏管理行（宁缺勿错删） -->
+    <section class="tag-settings" aria-label="标签设置">
+      <div class="settings-row row-color">
+        <span class="row-label">颜色</span>
+        <TagPalette :model-value="currentColor" @select="recolor" />
+        <span v-if="recolorError" class="recolor-error" role="alert">{{ recolorError }}</span>
       </div>
-
-      <!-- 重命名面板：预填当前名，Enter 提交 / Esc 取消 -->
-      <form v-if="panel === 'rename'" class="rename-panel" @submit.prevent="submitRename">
-        <input
-          ref="renameInput"
-          v-model="newName"
-          class="rename-input"
-          type="text"
-          placeholder="新标签名（不超过 32 字符）"
-          aria-label="新标签名"
-          @keydown.esc.prevent="closePanel"
-        />
-        <p class="panel-hint">{{ renameHint }}</p>
-        <p v-if="renameError" class="panel-error" role="alert">{{ renameError }}</p>
-        <div class="panel-actions">
-          <button type="button" class="panel-cancel" @click="closePanel">取消</button>
-          <button type="submit" class="panel-submit" :disabled="renamePending">确认执行</button>
+      <template v-if="indexLoaded">
+        <div class="settings-row row-manage">
+          <span class="row-label">管理</span>
+          <div class="manage-actions">
+            <button
+              type="button"
+              class="manage-btn"
+              :class="{ active: panel === 'rename' }"
+              :aria-expanded="panel === 'rename'"
+              @click="togglePanel('rename')"
+            >
+              重命名
+            </button>
+            <button
+              type="button"
+              class="manage-btn is-danger"
+              :class="{ active: panel === 'delete' }"
+              :aria-expanded="panel === 'delete'"
+              @click="togglePanel('delete')"
+            >
+              删除标签
+            </button>
+          </div>
         </div>
-      </form>
 
-      <!-- 删除面板：危险底色 + 影响面逐条清单，实底红确认 -->
-      <div v-if="panel === 'delete'" class="delete-panel">
-        <p class="delete-warning">
-          将从 {{ impact.length }} 个词条中移除该标签，并删除注册表条目（颜色设置随之失效）。此操作不可撤销。
-        </p>
-        <p v-if="impact.length === 0" class="panel-hint">
-          该标签未被任何词条携带，将只从注册表移除。
-        </p>
-        <ul v-else class="impact-list">
-          <li v-for="n in impact" :key="`${n.board}/${n.slug}`" class="impact-item">
-            <span class="impact-board">{{ n.label }}</span>
-            <RouterLink :to="`/v/${n.board}/${encodeURIComponent(n.slug)}`" class="impact-link">
-              {{ n.title }}
-            </RouterLink>
-          </li>
-        </ul>
-        <p v-if="deleteError" class="panel-error" role="alert">{{ deleteError }}</p>
-        <div class="panel-actions">
-          <button type="button" class="panel-cancel" @click="closePanel">取消</button>
-          <button type="button" class="panel-confirm" :disabled="deletePending" @click="submitDelete">
-            确认删除
-          </button>
+        <!-- 重命名面板：预填当前名，Enter 提交 / Esc 取消 -->
+        <form v-if="panel === 'rename'" class="rename-panel" @submit.prevent="submitRename">
+          <input
+            ref="renameInput"
+            v-model="newName"
+            class="rename-input"
+            type="text"
+            placeholder="新标签名（不超过 32 字符）"
+            aria-label="新标签名"
+            @keydown.esc.prevent="closePanel"
+          />
+          <p class="panel-hint">{{ renameHint }}</p>
+          <p v-if="renameError" class="panel-error" role="alert">{{ renameError }}</p>
+          <div class="panel-actions">
+            <button type="button" class="panel-cancel" @click="closePanel">取消</button>
+            <button type="submit" class="panel-submit" :disabled="renamePending">确认执行</button>
+          </div>
+        </form>
+
+        <!-- 删除面板：危险底色 + 影响面逐条清单，实底红确认 -->
+        <div v-if="panel === 'delete'" class="delete-panel">
+          <p class="delete-warning">
+            将从 {{ impact.length }} 个词条中移除该标签，并删除注册表条目（颜色设置随之失效）。此操作不可撤销。
+          </p>
+          <p v-if="impact.length === 0" class="panel-hint">
+            该标签未被任何词条携带，将只从注册表移除。
+          </p>
+          <ul v-else class="impact-list">
+            <li v-for="n in impact" :key="`${n.board}/${n.slug}`" class="impact-item">
+              <span class="impact-board">{{ n.label }}</span>
+              <RouterLink :to="`/v/${n.board}/${encodeURIComponent(n.slug)}`" class="impact-link">
+                {{ n.title }}
+              </RouterLink>
+            </li>
+          </ul>
+          <p v-if="deleteError" class="panel-error" role="alert">{{ deleteError }}</p>
+          <div class="panel-actions">
+            <button type="button" class="panel-cancel" @click="closePanel">取消</button>
+            <button type="button" class="panel-confirm" :disabled="deletePending" @click="submitDelete">
+              确认删除
+            </button>
+          </div>
         </div>
-      </div>
+      </template>
     </section>
 
     <p v-if="error" class="error">加载失败：{{ error }}</p>
@@ -297,31 +298,9 @@ onMounted(async () => {
   margin-bottom: var(--space-4);
 }
 
-/* 自定义颜色行（v1.1 体验迭代）：注册表优先、djb2 回落，点色即改全站生效 */
-.recolor-block {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  margin-bottom: var(--space-3);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-
-.recolor-label {
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-}
-
-.recolor-error {
-  font-size: var(--text-sm);
-  color: var(--color-danger);
-}
-
-/* 管理区（T2）：与取色行同卡片语言，操作按钮右置 */
-.manage-block {
+/* 设置卡（T2 收尾打磨）：取色与管理合并单卡，行间嵌线分隔——分隔线与
+   rename-panel 的 border-top 同语言，全卡统一 inset 嵌线节奏 */
+.tag-settings {
   padding: var(--space-3) var(--space-4);
   margin-bottom: var(--space-6);
   background: var(--color-surface);
@@ -329,22 +308,36 @@ onMounted(async () => {
   border-radius: var(--radius-md);
 }
 
-.manage-head {
+.settings-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
   flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
 }
 
-.manage-title {
+.settings-row + .settings-row {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.row-label {
+  flex-shrink: 0;
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
 }
 
-.manage-actions {
+/* 管理行按钮右置（原 manage-head 的两端对齐语义） */
+.row-manage .manage-actions {
   display: flex;
+  align-items: center;
   gap: var(--space-2);
+  margin-left: auto;
+}
+
+.recolor-error {
+  font-size: var(--text-sm);
+  color: var(--color-danger);
 }
 
 /* 管理按钮常态同「编辑」描边语言；danger 变体 hover/active 走危险色 */
