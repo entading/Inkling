@@ -178,6 +178,11 @@ async function submitCreate(): Promise<void> {
       </div>
       <div class="header-tools">
         <div class="seg" role="group" aria-label="排序方式">
+          <span
+            class="seg-thumb"
+            :class="{ 'seg-right': sort === 'used' }"
+            aria-hidden="true"
+          ></span>
           <button
             v-for="m in ([['name', '名称'], ['used', '常用']] as const)"
             :key="m[0]"
@@ -320,18 +325,38 @@ async function submitCreate(): Promise<void> {
   font-size: var(--text-base);
 }
 
-/* 排序切换（Board .seg 同族视觉）：灰底轨道 + 活动段浮起 */
+/* 排序切换（Board .seg 同族视觉）：灰底轨道 + 白底滑块（等宽双格 + translateX 滑动） */
 .seg {
-  display: flex;
-  align-items: center;
-  gap: 2px;
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
   padding: 3px;
   background: var(--color-surface-2);
   border-radius: var(--radius-full);
   flex-shrink: 0;
 }
 
+.seg-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-sm);
+}
+
+.seg-thumb.seg-right {
+  transform: translateX(100%);
+}
+
 .sort-chip {
+  position: relative;
+  z-index: 1;
+  width: 100%;
   padding: 4px 12px;
   font-size: var(--text-xs);
   font-family: inherit;
@@ -340,20 +365,26 @@ async function submitCreate(): Promise<void> {
   border: 1px solid transparent;
   border-radius: var(--radius-full);
   cursor: pointer;
-  transition: color var(--duration-fast) var(--ease-out),
-    background var(--duration-fast) var(--ease-out),
-    border-color var(--duration-fast) var(--ease-out);
+  transition: color var(--duration-fast) var(--ease-out);
 }
 
 .sort-chip:hover {
   color: var(--color-text);
 }
 
+/* 活动段的白底/边框/阴影由滑块层承担，文字保持 accent */
 .sort-chip.active {
   color: var(--color-accent);
-  background: var(--color-surface);
-  border-color: var(--color-border);
-  box-shadow: var(--shadow-sm);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* 滑块滑动（UX 打磨）：回弹曲线，reduced-motion 直跳不动画 */
+@media (prefers-reduced-motion: no-preference) {
+  .seg-thumb {
+    transition: transform var(--duration-slow) var(--ease-spring);
+  }
 }
 
 .wall-search {
