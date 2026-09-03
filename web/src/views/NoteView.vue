@@ -894,26 +894,26 @@ async function refreshMissingLinks(): Promise<void> {
 .speak-btn {
   flex: none;
   display: inline-flex;
-  align-self: center;
+  /* 标题右上方小按键（用户拍板）：顶部对齐落在音标右上，24px 小巧按键形态 */
+  align-self: flex-start;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  margin-top: 2px;
-  color: var(--color-text-secondary);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  width: 24px;
+  height: 24px;
+  margin-top: 1px;
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  border: none;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: color var(--duration-fast) var(--ease-out),
-    border-color var(--duration-fast) var(--ease-out),
     background-color var(--duration-fast) var(--ease-out),
     transform var(--duration-fast) var(--ease-out);
 }
 
 .speak-btn:hover {
-  color: var(--color-accent);
-  background: var(--color-accent-soft);
+  color: var(--color-on-accent);
+  background: var(--color-accent);
 }
 
 /* 选中朗读浮动工具条：fixed 定位，z-index 高于移动端底部导航 */
