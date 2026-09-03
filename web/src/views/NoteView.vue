@@ -454,6 +454,7 @@ async function refreshMissingLinks(): Promise<void> {
         <div class="note-head-main">
           <div class="title-row">
             <h1 class="note-title">{{ note.title }}</h1>
+            <p v-if="note.ipa" class="ipa">{{ note.ipa }}</p>
             <button
               v-if="ttsSupported"
               class="speak-btn"
@@ -469,7 +470,6 @@ async function refreshMissingLinks(): Promise<void> {
               </svg>
             </button>
           </div>
-          <p v-if="note.ipa" class="ipa">{{ note.ipa }}</p>
           <div class="note-tags">
             <TagBadge v-for="tag in note.tags" :key="tag" :tag="tag" />
           </div>
@@ -886,13 +886,15 @@ async function refreshMissingLinks(): Promise<void> {
 
 .title-row {
   display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
 }
 
 .speak-btn {
   flex: none;
   display: inline-flex;
+  align-self: center;
   align-items: center;
   justify-content: center;
   width: 32px;
@@ -942,13 +944,13 @@ async function refreshMissingLinks(): Promise<void> {
 }
 
 .ipa {
-  margin: 0 0 var(--space-3);
+  margin: 0;
   color: var(--color-text-secondary);
   font-family: var(--font-ipa);
   font-style: italic;
   font-size: var(--text-lg);
-  /* 超长不可断 IPA token 折行而非撑破（M1 .note-title / M5 .missing-banner 同款；
-     .ipa 为普通块级，非 flex item，anywhere 单独生效即可） */
+  /* 移入标题行（用户拍板）：行内元信息随标题 baseline 对齐；
+     超长不可断 IPA token 折行而非撑破（M1 同款） */
   overflow-wrap: anywhere;
 }
 
