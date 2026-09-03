@@ -10,6 +10,14 @@ import { isLegalWikiText, parseWikiTarget, setLinkIndex, WIKI_LINK_RE } from '..
 import { BOARD_LABELS, getSearchIndex, invalidateSearchIndex } from '../lib/search'
 import { isTtsSupported, speak } from '../lib/tts'
 
+/** 面包屑用板块全称（与板块页标题一致）；反链徽章等窄位仍用 BOARD_LABELS 短名 */
+const BOARD_PAGE_LABELS: Record<Board, string> = {
+  vocab: '词汇 · Vocab',
+  phrase: '短语 · Phrase',
+  sentence: '长难句 · Sentence',
+  grammar: '语法 · Grammar',
+}
+
 const route = useRoute()
 const router = useRouter()
 const note = ref<NoteDetailRaw | null>(null)
@@ -435,6 +443,13 @@ async function refreshMissingLinks(): Promise<void> {
     </div>
 
     <article v-else-if="note" class="note">
+      <RouterLink
+        :to="`/v/${route.params.board}`"
+        class="board-crumb"
+        :aria-label="`返回${BOARD_LABELS[route.params.board as Board]}板块`"
+      >
+        ← {{ BOARD_PAGE_LABELS[route.params.board as Board] }}
+      </RouterLink>
       <header class="note-header">
         <div class="note-head-main">
           <div class="title-row">
@@ -839,6 +854,21 @@ async function refreshMissingLinks(): Promise<void> {
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-4);
+}
+
+/* 返回板块面包屑（用户拍板方案 A）：卡片顶部独占一行，secondary→hover accent
+   对齐编辑页 .back-link 语言；RouterLink 在 header 外避免挤入横向 flex */
+.board-crumb {
+  display: inline-block;
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.board-crumb:hover {
+  color: var(--color-accent);
 }
 
 .note-head-main {
