@@ -6,14 +6,17 @@ import {
   deleteFont as deleteReadingFont,
   getFontPreference,
   getLinePreference,
+  getScopePreference,
   getSizePreference,
   importFont,
   readingFontsRef,
   refreshReadingFonts,
   setFontPreference,
   setLinePreference,
+  setScopePreference,
   setSizePreference,
   type ReadingFontPref,
+  type ReadingFontScope,
   type ReadingLine,
   type ReadingSize,
 } from '../lib/readingFont'
@@ -94,6 +97,7 @@ watch([readingFonts, fontPref], ([list, pref]) => {
 const fontGroup = ref<HTMLElement | null>(null)
 const sizeGroup = ref<HTMLElement | null>(null)
 const lineGroup = ref<HTMLElement | null>(null)
+const scopeGroup = ref<HTMLElement | null>(null)
 
 /** radiogroup 通用键盘模式（theme-seg 同款 roving tabindex）：方向键循环移动并选中 */
 function segKeydown(
@@ -151,6 +155,43 @@ function onLineSegKeydown(e: KeyboardEvent): void {
     lineGroup,
   )
 }
+
+// —— 覆盖范围（F1 追加）：仅对导入字体有意义，预设（默认衬线/无衬线）时置灰 ——
+
+const scopePref = ref<ReadingFontScope>(getScopePreference())
+const scopeEnabled = computed(() => fontPref.value !== '' && fontPref.value !== 'sans')
+
+const scopeOptions: ReadonlyArray<{ value: ReadingFontScope; label: string }> = [
+  { value: 'all', label: '全部' },
+  { value: 'cjk', label: '仅中文' },
+  { value: 'latin', label: '仅英文' },
+]
+
+function selectScope(v: ReadingFontScope): void {
+  scopePref.value = v
+  setScopePreference(v)
+}
+
+function onScopeSegKeydown(e: KeyboardEvent): void {
+  if (!scopeEnabled.value) return
+  segKeydown(
+    e,
+    scopeOptions.map((o) => o.value),
+    scopePref.value,
+    (v) => selectScope(v as ReadingFontScope),
+    scopeGroup,
+  )
+}
+
+// 跨页签偏好同步（复检修复）：他页签改偏好必然广播 → 本页签 resync 重拉列表
+// （readingFontsRef 引用更新）→ 此时从 localStorage 全量重读四项偏好，
+// 保证 seg 选中态与真实存储一致（否则残留他页签改动前的高亮）
+watch(readingFontsRef, () => {
+  fontPref.value = getFontPreference()
+  sizePref.value = getSizePreference()
+  linePref.value = getLinePreference()
+  scopePref.value = getScopePreference()
+})
 
 // —— 导入字体：选文件 → 内联命名表单 → 上传（禁 window 弹窗，T2 同款内联交互） ——
 
@@ -216,9 +257,11 @@ function resetReading(): void {
   fontPref.value = ''
   sizePref.value = 'md'
   linePref.value = 'normal'
+  scopePref.value = 'all'
   setFontPreference('')
   setSizePreference('md')
   setLinePreference('normal')
+  setScopePreference('all')
 }
 
 function formatSize(bytes: number): string {
@@ -412,6 +455,33 @@ onMounted(load)
             {{ opt.label }}
           </button>
         </div>
+      </div>
+
+      <div class="reading-block scope-block" :class="{ 'scope-off': !scopeEnabled }">
+        <span class="reading-label">覆盖范围</span>
+        <div
+          ref="scopeGroup"
+          class="theme-seg"
+          role="radiogroup"
+          aria-label="导入字体覆盖范围"
+          @keydown="onScopeSegKeydown"
+        >
+          <button
+            v-for="opt in scopeOptions"
+            :key="opt.value"
+            type="button"
+            role="radio"
+            class="theme-opt"
+            :disabled="!scopeEnabled"
+            :class="{ active: scopeEnabled && scopePref === opt.value }"
+            :aria-checked="scopePref === opt.value"
+            :tabindex="scopeEnabled && scopePref === opt.value ? 0 : -1"
+            @click="selectScope(opt.value)"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+        <span v-if="!scopeEnabled" class="scope-hint">选中导入字体后生效</span>
       </div>
 
       <ul v-if="readingFonts.length > 0" class="font-list">
@@ -933,6 +1003,27 @@ onMounted(load)
     flex: 1;
     width: auto;
     min-width: 0;
+  }
+}
+
+/* —— 覆盖范围（F1 追加）———————————————————————————— */
+/* 预设（默认衬线/无衬线）无覆盖概念：整块降透明 + 按钮禁用，scope 偏好值保留待切换 */
+.scope-block.scope-off {
+  opacity: 0.5;
+}
+
+.scope-block.scope-off .theme-opt {
+  cursor: default;
+}
+
+.scope-hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 767px) {
+  .scope-block {
+    flex-wrap: wrap;
   }
 }
 

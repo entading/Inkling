@@ -27,13 +27,19 @@ export type ReadingSize = 'sm' | 'md' | 'lg'
 export type ReadingLine = 'tight' | 'normal' | 'loose'
 /** 正文字体偏好：'' = 默认衬线；'sans' = 无衬线；其余 = 导入字体 id */
 export type ReadingFontPref = '' | 'sans' | string
+/** 导入字体覆盖范围（F1 追加，用户拍板）：all=全部字符；cjk=仅中文（英文回落默认衬线栈）；
+ * latin=仅英文（中文回落思源宋体）。实现 = 服务端按 unicode-range 过滤聚合 CSS，
+ * 切换零成本（不分片产物不变）；仅对导入字体有意义，预设时置灰 */
+export type ReadingFontScope = 'all' | 'cjk' | 'latin'
 
 const FONT_KEY = 'en_tool:reading-font'
 const SIZE_KEY = 'en_tool:reading-size'
 const LINE_KEY = 'en_tool:reading-line'
+const SCOPE_KEY = 'en_tool:reading-font-scope'
 
 const SIZE_VALUES: readonly ReadingSize[] = ['sm', 'md', 'lg']
 const LINE_VALUES: readonly ReadingLine[] = ['tight', 'normal', 'loose']
+const SCOPE_VALUES: readonly ReadingFontScope[] = ['all', 'cjk', 'latin']
 
 export const readingFontsRef = shallowRef<FontEntry[]>([])
 
@@ -154,6 +160,23 @@ export function setLinePreference(v: ReadingLine): void {
   broadcast()
 }
 
+export function getScopePreference(): ReadingFontScope {
+  try {
+    const v = localStorage.getItem(SCOPE_KEY)
+    if (v && SCOPE_VALUES.includes(v as ReadingFontScope)) return v as ReadingFontScope
+  } catch { /* 隐私模式 */ }
+  return 'all'
+}
+
+export function setScopePreference(v: ReadingFontScope): void {
+  try {
+    localStorage.setItem(SCOPE_KEY, v)
+  } catch { /* 隐私模式 */ }
+  // css 注入内容随 scope 变化：直接重注入（fetch 读本函数刚写入的最新 scope）
+  void injectFontCss()
+  broadcast()
+}
+
 /** 启动应用（main.ts 调用）：与 index.html 防闪脚本同语义，幂等重设 + 非法值修正 */
 export function applyReadingPreferencesAtBoot(): void {
   document.documentElement.dataset.readingSize = getSizePreference()
@@ -191,7 +214,9 @@ const DYNAMIC_CSS_ID = 'dynamic-font-faces'
 
 async function injectFontCss(): Promise<void> {
   try {
-    const res = await fetch('/api/fonts/css')
+    // scope 过滤由服务端执行（cjk/latin 分片取舍）；跨页签 scope 同步走
+    // broadcast → resync → getReadingFonts 重拉 → 本函数（读彼时最新 scope）
+    const res = await fetch(`/api/fonts/css?scope=${getScopePreference()}`)
     const css = res.ok ? await res.text() : ''
     let el = document.getElementById(DYNAMIC_CSS_ID) as HTMLStyleElement | null
     if (!el) {
