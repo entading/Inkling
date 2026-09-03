@@ -219,7 +219,9 @@ function applyFontFamily(pref: ReadingFontPref): void {
   }
   const font = readingFontsRef.value.find((f) => f.id === pref)
   const family = font?.family ?? `inkling-font-${pref}`
-  const base = getComputedStyle(document.documentElement).getPropertyValue('--font-serif').trim()
+  // base 必须读 --font-serif-base（tokens.css 拆分的唯一串源）：读 --font-serif 会拿到
+  // 自己上次 setProperty 写入的内联污染串（R-3：SPA 连续切换下栈首无限增殖 + 无衬线残留）
+  const base = getComputedStyle(document.documentElement).getPropertyValue('--font-serif-base').trim()
   if (!base) {
     // tokens.css 尚未就绪（CSSOM 未含定义）：等 load 后重试（正常时序到不了这里）
     if (document.readyState === 'loading') {
