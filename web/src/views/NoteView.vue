@@ -454,7 +454,6 @@ async function refreshMissingLinks(): Promise<void> {
         <div class="note-head-main">
           <div class="title-row">
             <h1 class="note-title">{{ note.title }}</h1>
-            <p v-if="note.ipa" class="ipa">{{ note.ipa }}</p>
             <button
               v-if="ttsSupported"
               class="speak-btn"
@@ -469,6 +468,7 @@ async function refreshMissingLinks(): Promise<void> {
                 <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
               </svg>
             </button>
+            <p v-if="note.ipa" class="ipa">{{ note.ipa }}</p>
           </div>
           <div class="note-tags">
             <TagBadge v-for="tag in note.tags" :key="tag" :tag="tag" />
@@ -894,15 +894,15 @@ async function refreshMissingLinks(): Promise<void> {
 .speak-btn {
   flex: none;
   display: inline-flex;
-  /* 标题右上方小按键（用户拍板）：顶部对齐落在音标右上，24px 小巧按键形态 */
+  /* 标题右上方、音标之前（用户拍板）：透明底 24px 小喇叭，hover 浮现 soft 底 */
   align-self: flex-start;
   align-items: center;
   justify-content: center;
   width: 24px;
   height: 24px;
   margin-top: 1px;
-  color: var(--color-accent);
-  background: var(--color-accent-soft);
+  color: var(--color-text-secondary);
+  background: transparent;
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -912,8 +912,8 @@ async function refreshMissingLinks(): Promise<void> {
 }
 
 .speak-btn:hover {
-  color: var(--color-on-accent);
-  background: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
 }
 
 /* 选中朗读浮动工具条：fixed 定位，z-index 高于移动端底部导航 */
