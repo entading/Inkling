@@ -1161,7 +1161,9 @@ async function refreshMissingLinks(): Promise<void> {
 
   .note-meta {
     flex-wrap: wrap;
-    gap: var(--space-2) var(--space-5);
+    /* 列间 0：间隔全部交给分隔点的对称 margin（原列 gap 24px + 点右 margin 8px
+       造成点两侧 3 倍间距差，用户报障） */
+    gap: var(--space-2) 0;
   }
 
   /* 页头纵向堆叠（UX 打磨）：标题区占满全宽——原与编辑/删除同行并排，
@@ -1178,9 +1180,12 @@ async function refreshMissingLinks(): Promise<void> {
 
   /* 页头精简（UX 打磨方案 A）：meta 统一次级灰（间隔点分隔单行灰字）、
      编辑/删除去边框底色降为文字链接——标题与正文成为页头主角；
-     删除确认态（实底红）用 :not(.confirm) 豁免不受弱化影响 */
+     删除确认态（实底红）用 :not(.confirm) 豁免不受弱化影响。
+     gap 双值：行 8px（三项折行时行距）/ 列 0——列间隔全交分隔点对称
+     margin（本块与上方移动排版块曾各写一份 gap 打架，列 8px 使点左
+     侧 16px 右 8px 不对称，用户报障，勿再单值覆盖） */
   .note-meta {
-    gap: var(--space-2);
+    gap: var(--space-2) 0;
     align-items: baseline;
   }
 
@@ -1188,10 +1193,14 @@ async function refreshMissingLinks(): Promise<void> {
     color: var(--color-text-secondary);
   }
 
-  /* 分隔点降为标签同字号：继承 16px 会撑高第二项造成两各项高度/基线不齐 */
+  /* 分隔点降为标签同字号：继承 16px 会撑高第二项造成两各项高度/基线不齐。
+     等宽盒居中 + 对称 margin-inline：点两侧间距精确相等（flex 列 gap 已归零） */
   .note-meta > div + div::before {
     content: "·";
-    margin-right: var(--space-2);
+    display: inline-block;
+    width: 1em;
+    text-align: center;
+    margin-inline: var(--space-2);
     font-size: var(--text-xs);
     color: var(--color-text-secondary);
   }
