@@ -241,12 +241,17 @@ function applyFontFamily(pref: ReadingFontPref): void {
 
 const DYNAMIC_CSS_ID = 'dynamic-font-faces'
 
+/** 注入代数：快速连切 scope / 导入删除并发时，后发请求的响应才允许落盘（防乱序覆盖） */
+let cssSeq = 0
+
 async function injectFontCss(): Promise<void> {
+  const seq = ++cssSeq
   try {
     // scope 过滤由服务端执行（cjk/latin 分片取舍）；跨页签 scope 同步走
     // broadcast → resync → getReadingFonts 重拉 → 本函数（读彼时最新 scope）
     const res = await fetch(`/api/fonts/css?scope=${getScopePreference()}`)
     const css = res.ok ? await res.text() : ''
+    if (seq !== cssSeq) return // 期间又有新请求发起：本响应是过期快照，丢弃
     let el = document.getElementById(DYNAMIC_CSS_ID) as HTMLStyleElement | null
     if (!el) {
       el = document.createElement('style')

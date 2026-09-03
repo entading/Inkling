@@ -418,7 +418,8 @@ export function registerRoutes(app: FastifyInstance, hooks?: ServerHooks): void 
     }
 
     const trimmed = name.trim()
-    if (trimmed.length < 1 || trimmed.length > 32) {
+    // 长度按码点计（与前端 onFileChosen 的 spread 截断同口径），代理对不拆成两个单元
+    if (trimmed.length < 1 || [...trimmed].length > 32) {
       return reply.code(400).send({ error: '字体名称必须为 1–32 个字符' })
     }
     if (!fileBuf) {
