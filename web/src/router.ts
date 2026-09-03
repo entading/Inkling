@@ -35,6 +35,11 @@ const router = createRouter({
     { path: '/settings', name: 'settings', component: Settings },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFound },
   ],
+  // 滚动管理（用户报障：板块页滚动后进词条，阅读页未从顶部开始）：
+  // 新导航（含面包屑/搜索跳转）回顶部；浏览器前进/后退恢复历史滚动位置
+  scrollBehavior(_to, _from, savedPosition) {
+    return savedPosition ?? { top: 0 }
+  },
 })
 
 router.afterEach((to) => {
