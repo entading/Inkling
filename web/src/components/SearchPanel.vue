@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getSearchIndex, search, type SearchGroup } from '../lib/search'
+import { tagColorIndex } from '../lib/tagColor'
 
 const props = defineProps<{ autofocus?: boolean }>()
 
@@ -217,6 +218,14 @@ onBeforeUnmount(() => {
         >
           <span class="item-title">{{ n.title }}</span>
           <span v-if="n.ipa" class="item-ipa">{{ n.ipa }}</span>
+          <span v-if="n.tags.length > 0" class="item-tags">
+            <span
+              v-for="t in n.tags"
+              :key="t"
+              class="item-tag"
+              :class="`tag-pair-${tagColorIndex(t)}`"
+            >{{ t }}</span>
+          </span>
           <span v-if="n.source" class="item-source" :title="n.source">{{ n.source }}</span>
         </li>
       </template>
@@ -384,6 +393,26 @@ onBeforeUnmount(() => {
   font-size: var(--text-xs);
   /* 超长不可断 IPA token 折行而非撑破（M3 .row-ipa 同款） */
   overflow-wrap: anywhere;
+}
+
+/* 标签徽章（复检交互优化）：纯展示（无 RouterLink——条目整行已是跳词条的 click，
+   内嵌链接会冒泡双导航）；色对走 tokens.css 全局 .tag-pair-N（基类不自带底色/字色），
+   取色走 tagColorIndex（注册表优先）。容器单行截断兜底，防多徽章挤压行尾来源 */
+.item-tags {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
+}
+
+.item-tag {
+  flex-shrink: 0;
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  border-radius: var(--radius-full);
 }
 
 /* 来源（复检交互优化）：推到行尾作元信息，超长省略号截断 + title 提示全文 */
