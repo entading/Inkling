@@ -65,8 +65,9 @@ export function runFuse<T>(fuse: Fuse<T>, q: string): T[] {
   return fuse.search(q.trim()).map((r) => r.item)
 }
 
-/** 板块内就地过滤：大小写不敏感子串匹配（title/tags/ipa/source；fulltext 时加搜 body）。
- * 模糊容忍是全局搜索语义；板块内快速收窄用子串更可预期 */
+/** 板块内就地过滤：大小写不敏感子串匹配（title/tags/source；fulltext 时加搜 body）。
+ * 音标不参与匹配（用户拍板：音标不可键入，只会造成噪声）；模糊容忍是全局搜索语义；
+ * 板块内快速收窄用子串更可预期 */
 export function searchBoard(
   notes: NoteMeta[],
   q: string,
@@ -78,7 +79,7 @@ export function searchBoard(
   const pool: NoteMeta[] = opts.fulltext && boardData ? boardData : notes
   const withBody = opts.fulltext && boardData
   return pool.filter((n) => {
-    const fields = [n.title, ...n.tags, n.ipa ?? '', n.source ?? '']
+    const fields = [n.title, ...n.tags, n.source ?? '']
     if (withBody) fields.push((n as NoteDetail).body)
     return fields.some((v) => v.toLowerCase().includes(query))
   })
