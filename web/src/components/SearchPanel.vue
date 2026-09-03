@@ -216,17 +216,23 @@ onBeforeUnmount(() => {
           @mousedown.prevent
           @click="go({ key: `${n.board}/${n.slug}`, type: 'note', board: n.board, slug: n.slug })"
         >
-          <span class="item-title">{{ n.title }}</span>
-          <span v-if="n.ipa" class="item-ipa">{{ n.ipa }}</span>
-          <span v-if="n.tags.length > 0" class="item-tags">
-            <span
-              v-for="t in n.tags"
-              :key="t"
-              class="item-tag"
-              :class="`tag-pair-${tagColorIndex(t)}`"
-            >{{ t }}</span>
-          </span>
-          <span v-if="n.source" class="item-source" :title="n.source">{{ n.source }}</span>
+          <div class="item-body">
+            <div class="item-main">
+              <span class="item-title">{{ n.title }}</span>
+              <span v-if="n.ipa" class="item-ipa">{{ n.ipa }}</span>
+            </div>
+            <div v-if="n.tags.length > 0 || n.source" class="item-meta">
+              <span v-if="n.tags.length > 0" class="item-tags">
+                <span
+                  v-for="t in n.tags"
+                  :key="t"
+                  class="item-tag"
+                  :class="`tag-pair-${tagColorIndex(t)}`"
+                >{{ t }}</span>
+              </span>
+              <span v-if="n.source" class="item-source" :title="n.source">{{ n.source }}</span>
+            </div>
+          </div>
         </li>
       </template>
     </ul>
@@ -377,6 +383,30 @@ onBeforeUnmount(() => {
 
 .drop-item.active {
   background: var(--color-accent-soft);
+}
+
+/* 条目双行分层（用户拍板方案 A）：行 1 主识别（标题+音标）、行 2 元数据（标签左+来源右推）。
+   内层 item-body 包裹，li 本身布局不动（组头行共用 .drop-item 类，勿改其 display） */
+.item-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item-main {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.item-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .item-title {
