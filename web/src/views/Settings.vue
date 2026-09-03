@@ -187,15 +187,19 @@ function onScopeSegKeydown(e: KeyboardEvent): void {
   )
 }
 
-// —— 另一侧字体（方案 B）：scope=cjk|latin 时被导入字体让出的那侧用衬线还是无衬线 ——
+// —— 另一侧字体（方案 B）：scope=cjk|latin 时被导入字体让出的那侧用衬线还是无衬线。
+// 行常驻（不 v-if）：切覆盖范围/正文字体时下方内容不跳动（复检交互优化），
+// 非生效态整块置灰禁用，与 scope-off 同款视觉语言 ——
 
 const fallbackPref = ref<ReadingFallback>(getFallbackPreference())
-const fallbackVisible = computed(
+const fallbackEnabled = computed(
   () => fontPref.value !== '' && fontPref.value !== 'sans' && scopePref.value !== 'all',
 )
-const fallbackHint = computed(() =>
-  scopePref.value === 'cjk' ? '作用于英文与共用标点' : '作用于中文与全角标点',
-)
+const fallbackHint = computed(() => {
+  if (fontPref.value === '' || fontPref.value === 'sans') return '选中导入字体后生效'
+  if (scopePref.value === 'all') return '覆盖范围为全部时由导入字体接管'
+  return scopePref.value === 'cjk' ? '作用于英文与共用标点' : '作用于中文与全角标点'
+})
 
 const fallbackOptions: ReadonlyArray<{ value: ReadingFallback; label: string }> = [
   { value: '', label: '默认衬线' },
@@ -208,7 +212,7 @@ function selectFallback(v: ReadingFallback): void {
 }
 
 function onFallbackSegKeydown(e: KeyboardEvent): void {
-  if (!fallbackVisible.value) return
+  if (!fallbackEnabled.value) return
   segKeydown(
     e,
     fallbackOptions.map((o) => o.value),
@@ -245,7 +249,8 @@ function onFileChosen(e: Event): void {
   importError.value = ''
   if (!file) return
   pendingFile.value = file
-  pendingName.value = file.name.replace(/\.(ttf|otf|woff2)$/i, '').slice(0, 32)
+  // 码点截断（spread 而非 slice）：含代理对的字体名（扩展 CJK/emoji）不会被切成半字符
+  pendingName.value = [...file.name.replace(/\.(ttf|otf|woff2)$/i, '')].slice(0, 32).join('')
 }
 
 async function confirmImport(): Promise<void> {
@@ -474,11 +479,13 @@ onMounted(load)
         <span class="reading-label">正文字体</span>
         <div
           ref="fontGroup"
-          class="theme-seg"
+          class="reading-seg"
+          :style="{ '--seg-cols': 2, '--seg-index': fontPref === 'sans' ? 1 : 0 }"
           role="radiogroup"
           aria-label="正文字体"
           @keydown="onFontSegKeydown"
         >
+          <span class="seg-thumb" :class="{ 'seg-thumb-none': fontPref !== '' && fontPref !== 'sans' }" aria-hidden="true" />
           <button
             v-for="opt in fontPresetOptions"
             :key="opt.value || 'serif'"
@@ -499,11 +506,13 @@ onMounted(load)
         <span class="reading-label">覆盖范围</span>
         <div
           ref="scopeGroup"
-          class="theme-seg"
+          class="reading-seg"
+          :style="{ '--seg-cols': scopeOptions.length, '--seg-index': Math.max(0, scopeOptions.findIndex(o => o.value === scopePref)) }"
           role="radiogroup"
           aria-label="导入字体覆盖范围"
           @keydown="onScopeSegKeydown"
         >
+          <span class="seg-thumb" aria-hidden="true" />
           <button
             v-for="opt in scopeOptions"
             :key="opt.value"
@@ -522,24 +531,27 @@ onMounted(load)
         <span v-if="!scopeEnabled" class="scope-hint">选中导入字体后生效</span>
       </div>
 
-      <div v-if="fallbackVisible" class="reading-block">
+      <div class="reading-block scope-block" :class="{ 'scope-off': !fallbackEnabled }">
         <span class="reading-label">另一侧字体</span>
         <div
           ref="fallbackGroup"
-          class="theme-seg"
+          class="reading-seg"
+          :style="{ '--seg-cols': fallbackOptions.length, '--seg-index': Math.max(0, fallbackOptions.findIndex(o => o.value === fallbackPref)) }"
           role="radiogroup"
           aria-label="另一侧字体"
           @keydown="onFallbackSegKeydown"
         >
+          <span class="seg-thumb" aria-hidden="true" />
           <button
             v-for="opt in fallbackOptions"
             :key="opt.value || 'serif'"
             type="button"
             role="radio"
             class="theme-opt"
-            :class="{ active: fallbackPref === opt.value }"
+            :disabled="!fallbackEnabled"
+            :class="{ active: fallbackEnabled && fallbackPref === opt.value }"
             :aria-checked="fallbackPref === opt.value"
-            :tabindex="fallbackPref === opt.value ? 0 : -1"
+            :tabindex="fallbackEnabled && fallbackPref === opt.value ? 0 : -1"
             @click="selectFallback(opt.value)"
           >
             {{ opt.label }}
@@ -613,11 +625,13 @@ onMounted(load)
         <span class="reading-label">字号</span>
         <div
           ref="sizeGroup"
-          class="theme-seg"
+          class="reading-seg"
+          :style="{ '--seg-cols': sizeOptions.length, '--seg-index': Math.max(0, sizeOptions.findIndex(o => o.value === sizePref)) }"
           role="radiogroup"
           aria-label="正文字号"
           @keydown="onSizeSegKeydown"
         >
+          <span class="seg-thumb" aria-hidden="true" />
           <button
             v-for="opt in sizeOptions"
             :key="opt.value"
@@ -638,11 +652,13 @@ onMounted(load)
         <span class="reading-label">行距</span>
         <div
           ref="lineGroup"
-          class="theme-seg"
+          class="reading-seg"
+          :style="{ '--seg-cols': lineOptions.length, '--seg-index': Math.max(0, lineOptions.findIndex(o => o.value === linePref)) }"
           role="radiogroup"
           aria-label="正文行距"
           @keydown="onLineSegKeydown"
         >
+          <span class="seg-thumb" aria-hidden="true" />
           <button
             v-for="opt in lineOptions"
             :key="opt.value"
@@ -1088,6 +1104,62 @@ onMounted(load)
 @media (max-width: 767px) {
   .scope-block {
     flex-wrap: wrap;
+  }
+}
+
+/* —— 阅读排版 seg 滑块（复检交互优化）——Board .seg-thumb 配方移植、N 格通用：
+   等宽 grid（按钮 min-width 保底）+ thumb 白底承担选中视觉、按钮只留 accent 字色；
+   位移过渡 --duration-slow + --ease-spring 且必须包 no-preference（reduced-motion 直跳） */
+.reading-seg {
+  position: relative;
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  padding: 3px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.reading-seg .seg-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / var(--seg-cols));
+  transform: translateX(calc(var(--seg-index) * 100%));
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .reading-seg .seg-thumb {
+    transition: transform var(--duration-slow) var(--ease-spring),
+      opacity var(--duration-base) var(--ease-out);
+  }
+}
+
+/* 选中导入字体时正文字体组两个预设均未选：thumb 淡出（停在原格会误导为已选） */
+.reading-seg .seg-thumb-none {
+  opacity: 0;
+}
+
+.reading-seg .theme-opt {
+  position: relative;
+  min-width: 5.5em;
+  text-align: center;
+}
+
+.reading-seg .theme-opt.active {
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .reading-seg .theme-opt:active {
+    transform: scale(0.98);
   }
 }
 
