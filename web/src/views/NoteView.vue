@@ -888,7 +888,8 @@ async function refreshMissingLinks(): Promise<void> {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: var(--space-2) var(--space-3);
+  /* 列 4px（用户拍板拉近）：按钮贴标题右上、音标贴按钮；行 8px 为折行行距 */
+  gap: var(--space-2) var(--space-1);
 }
 
 .speak-btn {
