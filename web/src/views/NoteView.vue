@@ -502,7 +502,6 @@ async function refreshMissingLinks(): Promise<void> {
       <MarkdownViewer :body="note.body" @toc="onToc" />
 
       <section v-if="backlinks.length > 0" class="backlinks" aria-label="反向引用">
-        <h2 class="backlinks-title">反向引用</h2>
         <ul class="backlinks-list">
           <li v-for="b in backlinks" :key="`${b.board}/${b.slug}`">
             <RouterLink :to="`/v/${b.board}/${encodeURIComponent(b.slug)}`" class="backlink-link">
@@ -1075,18 +1074,12 @@ async function refreshMissingLinks(): Promise<void> {
   color: var(--color-danger);
 }
 
-/* 反向引用面板（M5）：无引用时整节隐藏 */
+/* 反向引用面板（M5）：无引用时整节隐藏；「反向引用」标题已按用户拍板移除
+   （仅留链接，section aria-label 维持无障碍语义），分隔线即区块分界 */
 .backlinks {
   margin-top: var(--space-7);
   padding-top: var(--space-4);
   border-top: 1px solid var(--color-border);
-}
-
-.backlinks-title {
-  margin: 0 0 var(--space-3);
-  font-size: var(--text-base);
-  font-weight: 600;
-  color: var(--color-text-secondary);
 }
 
 .backlinks-list {
