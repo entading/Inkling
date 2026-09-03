@@ -52,6 +52,13 @@ export function getReadingFonts(): Promise<FontEntry[]> {
       if (issuedAt === mutationSeq) {
         apply(list)
         void injectFontCss()
+        // 死偏好校验：指向已不存在（被他端/他页签删除）的字体 id → 回落默认。
+        // 每次真实拉取都会经过这里（缓存命中不走此路，但缓存失效必然重拉），无环：
+        // setFontPreference 的广播对端 resync 后校验通过不再广播
+        const pref = getFontPreference()
+        if (pref && pref !== 'sans' && !list.some((f) => f.id === pref)) {
+          setFontPreference('')
+        }
       }
       return list
     }).catch((e) => {

@@ -83,6 +83,14 @@ const lineOptions: ReadonlyArray<{ value: ReadingLine; label: string }> = [
 
 const readingFonts = computed(() => readingFontsRef.value)
 
+// 正文字体选中态联动（复检修复）：lib 层死偏好回落（字体被他端删除）或删除正用字体后，
+// 本页 ref 需同步清空，避免「无任何 radio 选中」的幽灵态；''/'sans' 无列表依赖不参与
+watch([readingFonts, fontPref], ([list, pref]) => {
+  if (pref && pref !== 'sans' && !list.some((f) => f.id === pref)) {
+    fontPref.value = ''
+  }
+})
+
 const fontGroup = ref<HTMLElement | null>(null)
 const sizeGroup = ref<HTMLElement | null>(null)
 const lineGroup = ref<HTMLElement | null>(null)
