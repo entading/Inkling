@@ -13,6 +13,7 @@
     "build:fonts": "npm run build:fonts -w web"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "cn-font-split": "^7.4.3"
   }
 }

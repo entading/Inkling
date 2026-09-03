@@ -359,11 +359,12 @@ watch(() => props.body, hidePreview)
 
 <style scoped>
 /* 样式迁自 NoteView.vue（M4 抽组件），阅读页与编辑页预览共用 */
-/* 正文衬线层（§3）：整体衬线 + 17px + 1.8 行高；UI 层与 .ipa 不在此组件内，不受影响 */
+/* 正文衬线层（§3）：整体衬线 + 档位字号（--note-body-size，F1 阅读排版）+ 档位行高；
+   UI 层与 .ipa 不在此组件内，不受影响 */
 .note-body {
   font-family: var(--font-serif);
-  font-size: var(--text-body);
-  line-height: 1.8;
+  font-size: var(--note-body-size);
+  line-height: var(--note-line-height);
   letter-spacing: 0.01em;
   color: var(--color-text);
   /* 中西文混排自动加间距（Chromium 140+ 渐进增强，旧浏览器整行忽略） */
@@ -680,9 +681,9 @@ watch(() => props.body, hidePreview)
 
 @media (max-width: 767px) {
   .note-body {
-    /* 16px（UX 打磨，用户拍板）：较 --text-base 略微放大，每行 ~18 字；
-       h3 的 1.12em 相对缩放自动跟随，层级比恒定 */
-    font-size: var(--text-md);
+    /* 移动端档位（F1）：--note-body-size 在 tokens.css 的 767 媒体块内覆盖为
+       16px 基准 + sm/lg 收窄档（D7）；h3 的 1.12em 相对缩放自动跟随，层级比恒定 */
+    font-size: var(--note-body-size);
   }
 
   /* 表格（UX 打磨 v2）：「按词折行 + min-width 保底 + 字号降档」——

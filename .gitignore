@@ -7,3 +7,6 @@ dist/
 
 # 字体分片源文件（不入库，获取方式见 web/scripts/build-fonts.mjs 头注释）
 web/scripts/font-src/
+
+# 运行时导入的字体文件（F1，用户自担版权的二进制资产不入库；data/tags.json 仍跟踪）
+data/fonts/
