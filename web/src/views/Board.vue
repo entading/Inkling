@@ -8,11 +8,25 @@ import Skeleton from '../components/Skeleton.vue'
 import { api, type Board, type NoteDetail, type NoteMeta } from '../api'
 import { getSearchIndex, searchBoard } from '../lib/search'
 import { useStaggerArm } from '../lib/stagger'
+import { useMediaQuery } from '@vueuse/core'
 
 const props = defineProps<{ board: Board }>()
 
 const route = useRoute()
 const router = useRouter()
+
+/** 搜索提示（方案 A，用户拍板）：字段列表按板块修正——音标维度仅词汇存在
+ * （其余板块 ipa 恒空，提示失真）；移动端换精简文案避免窄输入框溢出截断
+ * （移动去「来源」低频维度留余量；桌面词汇保持原四项） */
+const isMobileViewport = useMediaQuery('(max-width: 767px)')
+const searchPlaceholder = computed(() => {
+  if (isMobileViewport.value) {
+    return props.board === 'vocab' ? '过滤：标题 / 标签 / 音标' : '过滤：标题 / 标签 / 来源'
+  }
+  return props.board === 'vocab'
+    ? '在本板块内过滤（标题 / 标签 / 音标 / 来源）'
+    : '在本板块内过滤（标题 / 标签 / 来源）'
+})
 
 const boardLabels: Record<Board, string> = {
   vocab: '词汇 · Vocab',
@@ -221,7 +235,7 @@ watch(() => route.query, syncFromRoute)
         v-model="query"
         class="board-search-input"
         type="text"
-        placeholder="在本板块内过滤（标题 / 标签 / 音标 / 来源）"
+        :placeholder="searchPlaceholder"
         aria-label="板块内搜索"
       />
       <button
