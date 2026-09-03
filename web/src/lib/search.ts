@@ -54,9 +54,11 @@ const BODY_KEYS: FuseOptionKey<NoteDetail>[] = ['title', 'tags', 'body']
 export function buildFuse<T>(items: T[], keys: FuseOptionKey<T>[]): Fuse<T> {
   return new Fuse(items, {
     keys,
-    // 忽略位置（中文子串命中）、放宽阈值（容忍拼写错误）
+    // 忽略位置（中文子串命中）。threshold 0.2（用户拍板，原 0.35）：压掉「字符分散命中」
+    // ——3-4 字符查询的 1 错配分散命中分数 ~0.25-0.33 被拒（ser 不再搜出 perseverance），
+    // 真拼写误差仍保留（serendipiy 漏 1 字符 ≈ 0.09 命中）
     ignoreLocation: true,
-    threshold: 0.35,
+    threshold: 0.2,
     minMatchCharLength: 1,
   })
 }
