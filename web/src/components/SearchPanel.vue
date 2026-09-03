@@ -217,6 +217,7 @@ onBeforeUnmount(() => {
         >
           <span class="item-title">{{ n.title }}</span>
           <span v-if="n.ipa" class="item-ipa">{{ n.ipa }}</span>
+          <span v-if="n.source" class="item-source" :title="n.source">{{ n.source }}</span>
         </li>
       </template>
     </ul>
@@ -383,6 +384,18 @@ onBeforeUnmount(() => {
   font-size: var(--text-xs);
   /* 超长不可断 IPA token 折行而非撑破（M3 .row-ipa 同款） */
   overflow-wrap: anywhere;
+}
+
+/* 来源（复检交互优化）：推到行尾作元信息，超长省略号截断 + title 提示全文 */
+.item-source {
+  margin-left: auto;
+  flex-shrink: 0;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
 }
 
 .drop-empty {
