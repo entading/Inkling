@@ -132,11 +132,15 @@ textarea {
     sans-serif;
   --font-ipa:
     'Noto Sans', 'Noto Sans IPA', 'Noto Sans SC', var(--font-sans);
-  /* 正文衬线（§3 定稿：屏显优化英文栈 + 思源宋体分片 webfont，分片见 styles/fonts.css） */
-  --font-serif:
+  /* 正文衬线（§3 定稿：屏显优化英文栈 + 思源宋体分片 webfont，分片见 styles/fonts.css）。
+     拆两段：--font-serif-base 持唯一串源，--font-serif 派生——readingFont.ts 的
+     栈首插入读 base（getComputedStyle 读 --font-serif 会读到自己上次写入的内联
+     污染串，SPA 连续切换下无限增殖，R-3 实测），勿合并回单变量 */
+  --font-serif-base:
     'Charter', 'Bitstream Charter', 'Cambria', 'Constantia', Georgia,
     'Noto Serif SC Web', 'Source Han Serif SC', 'Noto Serif SC', 'Songti SC',
     SimSun, serif;
+  --font-serif: var(--font-serif-base);
   /* 代码等宽栈（.note-body 内 code/pre/kbd/samp 用，防衬线污染） */
   --font-mono:
     ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono',
