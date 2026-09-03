@@ -529,7 +529,6 @@ watch(() => route.params, load)
         <RouterLink :to="`/v/${route.params.board}/${route.params.slug}`" class="back-link">
           ← 返回阅读页
         </RouterLink>
-        <span class="edit-title">{{ note?.title ?? String(route.params.slug) }}</span>
       </div>
       <div class="edit-head-right">
         <span v-if="saveState === 'saving'" class="save-state">保存中…</span>
@@ -588,16 +587,6 @@ watch(() => route.params, load)
           @click="prefixLines('> ')"
         >
           <Icon name="quote" :size="16" />
-        </button>
-        <button
-          type="button"
-          class="tool-btn"
-          title="二级标题 ## （行首）"
-          aria-label="二级标题"
-          @mousedown.prevent
-          @click="prefixLines('## ', true)"
-        >
-          <Icon name="h2" :size="16" />
         </button>
         <button
           type="button"
@@ -743,14 +732,6 @@ watch(() => route.params, load)
 
 .back-link:hover {
   color: var(--color-accent);
-}
-
-.edit-title {
-  font-size: var(--text-lg);
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .edit-head-right {

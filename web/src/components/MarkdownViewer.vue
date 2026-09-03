@@ -376,16 +376,40 @@ watch(() => props.body, hidePreview)
 }
 
 /* 标题沿用现有字距（§3：letter-spacing 只调正文，不进标题），serif 字形下标题断行取平衡 */
+/* 标题字号阶梯（UX 打磨，用户拍板对齐业界比例——GitHub/Notion/Typora 通用
+   h1≈1.5em/h2≈1.3em/h3≈1.12em，每级 13-15% 递减；推翻 M2' 的 --text-xl/--text-lg
+   映射：旧 h2 1.03em 与正文无层次且 h3>h2 倒挂）。em 相对正文缩放，双端层级比恒定 */
+.note-body :deep(h1),
+.note-body :deep(h2),
+.note-body :deep(h3) {
+  /* 标题行高 1.25（UX 打磨）：继承正文 1.8 时大字号的半行距悬空巨大
+     （24px 字行盒 43.2px），标题-正文视觉间距被撑到 ≈ 行距；业界标题行高 1.25 */
+  line-height: 1.25;
+}
+
 .note-body :deep(h1) {
-  font-size: var(--text-xl);
-  margin: 1.6em 0 0.6em;
+  font-size: 1.5em;
+  /* 标题间距阶梯（UX 打磨）：上边距三级递减（h1 1.0/h2 0.9/h3 0.8em）+ 整体收紧，
+     层次感 25.5/19.9/15.2px；下边距被段落 margin 折叠吞没故保持小值 */
+  margin: 1em 0 0.4em;
   text-wrap: balance;
   letter-spacing: normal;
 }
 
+/* 正文首元素为标题时清顶边距（UX 打磨方案 C 修正版）：标题自带大 margin 语义
+   （h1 1.2em×字号 ≈ 26px）首位时清零才不至于页头下巨大空隙；首元素为段落时
+   保留 1.05em 自然呼吸。**必须 :deep()**——渲染输出的 h1/h2/h3 无 scoped 属性，
+   非 deep 版编译后要求 [data-v] 永不匹配（已实测踩坑） */
+.note-body > :deep(h1:first-child),
+.note-body > :deep(h2:first-child),
+.note-body > :deep(h3:first-child) {
+  margin-top: 0;
+}
+
 .note-body :deep(h2) {
-  font-size: var(--text-lg);
-  margin: 1.5em 0 0.5em;
+  font-size: 1.3em;
+  font-weight: 700;
+  margin: 0.9em 0 0.5em;
   text-wrap: balance;
   letter-spacing: normal;
   /* TOC/锚点跳转时给标题留出视口上缘呼吸位（M2 scroll-margin 同机制） */
@@ -397,7 +421,7 @@ watch(() => props.body, hidePreview)
 .note-body :deep(h3) {
   font-size: 1.12em;
   font-weight: 700;
-  margin: 1.6em 0 0.5em;
+  margin: 0.8em 0 0.5em;
   text-wrap: balance;
   letter-spacing: normal;
   scroll-margin-top: var(--space-6);
@@ -411,11 +435,15 @@ watch(() => props.body, hidePreview)
 .note-body :deep(ul),
 .note-body :deep(ol) {
   margin: 0.6em 0;
-  padding-left: 1.6em;
+  /* 1.15em（UX 打磨，原 1.6em）：每层嵌套缩进收敛，二级列表不再横漂过远 */
+  padding-left: 1.15em;
 }
 
 .note-body :deep(li) {
   margin: 0.3em 0;
+  /* 圆点/数字与文字的间距增大（UX 打磨）：marker 锚在内容盒左缘，
+     推移内容盒即拉开 marker—文字距离，marker 位置不变 */
+  padding-inline-start: 0.35em;
 }
 
 .note-body :deep(blockquote) {
