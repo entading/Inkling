@@ -3,7 +3,7 @@
  * 全站线性图标（§4）：内联注册 path 数据，不引图标库。
  * 风格与既有喇叭/放大镜一致：viewBox 0 0 24 24、stroke currentColor、
  * stroke-width 1.8、fill none、圆角端点（圆点类图标局部 fill currentColor）。
- * copy/check/sun/moon/monitor/list 供 M4'/M5' 预注册；bold/italic/code/quote/h2/wiki
+ * copy/check/sun/moon/monitor/list 供 M4'/M5' 预注册；bold/italic/code/quote/wiki
  * 为 M5' 编辑器格式工具条注册（M2' 已注册的 plus/arrow-up 分别供 M5' FAB/回顶使用）。
  */
 const ICONS = {
@@ -35,7 +35,6 @@ const ICONS = {
   italic: '<line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/>',
   code: '<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>',
   quote: '<path d="M10 11H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4"/><path d="M20 11h-4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4"/>',
-  h2: '<path d="M4 12h8"/><path d="M4 6v16"/><path d="M12 6v16"/><path d="M17 20c0-3.5 4-2.5 4-5.5 0-1.7-1.3-2.5-2.5-2.5-1.1 0-2 .5-2.5 1.2"/>',
   wiki: '<path d="M9 4H4v16h5"/><path d="M15 4h5v16h-5"/><path d="M8 12h8"/>',
 } as const
 

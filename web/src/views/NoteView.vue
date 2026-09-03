@@ -930,6 +930,12 @@ async function refreshMissingLinks(): Promise<void> {
   margin-bottom: var(--space-4);
 }
 
+/* 无标签时空容器隐藏（UX 打磨）：margin 不再空占 16px，标题贴近分隔线；
+   有标签时 :empty 自动失配，留白恢复 */
+.note-tags:empty {
+  display: none;
+}
+
 .note-meta {
   display: flex;
   gap: var(--space-6);
@@ -1133,6 +1139,64 @@ async function refreshMissingLinks(): Promise<void> {
   .note-meta {
     flex-wrap: wrap;
     gap: var(--space-2) var(--space-5);
+  }
+
+  /* 页头纵向堆叠（UX 打磨）：标题区占满全宽——原与编辑/删除同行并排，
+     操作组占 131px 挤得标题区仅剩 184px（meta 折两行、标题偏左上局促）；
+     操作组下移左对齐（用户拍板，与标题/meta 左缘一线） */
+  .note-header {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .note-head-actions {
+    align-self: flex-start;
+  }
+
+  /* 页头精简（UX 打磨方案 A）：meta 统一次级灰（间隔点分隔单行灰字）、
+     编辑/删除去边框底色降为文字链接——标题与正文成为页头主角；
+     删除确认态（实底红）用 :not(.confirm) 豁免不受弱化影响 */
+  .note-meta {
+    gap: var(--space-2);
+    align-items: baseline;
+  }
+
+  .note-meta dd {
+    color: var(--color-text-secondary);
+  }
+
+  /* 分隔点降为标签同字号：继承 16px 会撑高第二项造成两各项高度/基线不齐 */
+  .note-meta > div + div::before {
+    content: "·";
+    margin-right: var(--space-2);
+    font-size: var(--text-xs);
+    color: var(--color-text-secondary);
+  }
+
+  .note-head-actions .edit-link,
+  .note-head-actions .delete-btn:not(.confirm) {
+    background: transparent;
+    border-color: transparent;
+    padding: var(--space-1) var(--space-2);
+  }
+
+  /* 负 margin 抵消编辑的左 padding：「编辑」文字与上方「创建」文字精确对齐 */
+  .note-head-actions .edit-link {
+    color: var(--color-accent);
+    margin-left: calc(-1 * var(--space-2));
+  }
+
+  .note-head-actions .delete-btn:not(.confirm) {
+    color: var(--color-text-secondary);
+  }
+
+  /* 确认态文字化（UX 打磨，用户拍板）：移动端红字「确认删除？」替代实底红按钮 */
+  .note-head-actions .delete-btn.confirm {
+    background: transparent;
+    border-color: transparent;
+    padding: var(--space-1) var(--space-2);
+    color: var(--color-danger);
+    font-weight: 600;
   }
 }
 </style>
