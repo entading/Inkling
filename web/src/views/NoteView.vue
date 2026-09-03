@@ -1178,30 +1178,18 @@ async function refreshMissingLinks(): Promise<void> {
     align-self: flex-start;
   }
 
-  /* 页头精简（UX 打磨方案 A）：meta 统一次级灰（间隔点分隔单行灰字）、
-     编辑/删除去边框底色降为文字链接——标题与正文成为页头主角；
-     删除确认态（实底红）用 :not(.confirm) 豁免不受弱化影响。
-     gap 双值：行 8px（三项折行时行距）/ 列 0——列间隔全交分隔点对称
-     margin（本块与上方移动排版块曾各写一份 gap 打架，列 8px 使点左
-     侧 16px 右 8px 不对称，用户报障，勿再单值覆盖） */
+  /* 页头精简（UX 打磨方案 A）：meta 统一次级灰、编辑/删除去边框底色降为
+     文字链接——标题与正文成为页头主角；删除确认态（实底红）用 :not(.confirm)
+     豁免不受弱化影响 */
+  /* 分隔点已移除（三轮迭代后定稿，用户报障两次）：移动 323px 宽三项必折行，
+     折行时分隔点变行尾/行首悬空装饰，对称 margin 无解；行/列间距 12px +
+     dt 灰/dd 白字色已提供视觉分组（桌面 meta 用 space-6 gap 本就无点） */
   .note-meta {
-    gap: var(--space-2) 0;
+    gap: var(--space-3);
     align-items: baseline;
   }
 
   .note-meta dd {
-    color: var(--color-text-secondary);
-  }
-
-  /* 分隔点降为标签同字号：继承 16px 会撑高第二项造成两各项高度/基线不齐。
-     等宽盒居中 + 对称 margin-inline：点两侧间距精确相等（flex 列 gap 已归零） */
-  .note-meta > div + div::before {
-    content: "·";
-    display: inline-block;
-    width: 1em;
-    text-align: center;
-    margin-inline: var(--space-2);
-    font-size: var(--text-xs);
     color: var(--color-text-secondary);
   }
 
