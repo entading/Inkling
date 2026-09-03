@@ -4,6 +4,7 @@ import { api, type FontEntry, type ServerInfo } from '../api'
 import { useTheme, type ThemePreference } from '../lib/theme'
 import {
   deleteFont as deleteReadingFont,
+  getFallbackPreference,
   getFontPreference,
   getLinePreference,
   getScopePreference,
@@ -11,10 +12,12 @@ import {
   importFont,
   readingFontsRef,
   refreshReadingFonts,
+  setFallbackPreference,
   setFontPreference,
   setLinePreference,
   setScopePreference,
   setSizePreference,
+  type ReadingFallback,
   type ReadingFontPref,
   type ReadingFontScope,
   type ReadingLine,
@@ -98,6 +101,7 @@ const fontGroup = ref<HTMLElement | null>(null)
 const sizeGroup = ref<HTMLElement | null>(null)
 const lineGroup = ref<HTMLElement | null>(null)
 const scopeGroup = ref<HTMLElement | null>(null)
+const fallbackGroup = ref<HTMLElement | null>(null)
 
 /** radiogroup 通用键盘模式（theme-seg 同款 roving tabindex）：方向键循环移动并选中 */
 function segKeydown(
@@ -183,14 +187,46 @@ function onScopeSegKeydown(e: KeyboardEvent): void {
   )
 }
 
+// —— 另一侧字体（方案 B）：scope=cjk|latin 时被导入字体让出的那侧用衬线还是无衬线 ——
+
+const fallbackPref = ref<ReadingFallback>(getFallbackPreference())
+const fallbackVisible = computed(
+  () => fontPref.value !== '' && fontPref.value !== 'sans' && scopePref.value !== 'all',
+)
+const fallbackHint = computed(() =>
+  scopePref.value === 'cjk' ? '作用于英文与共用标点' : '作用于中文与全角标点',
+)
+
+const fallbackOptions: ReadonlyArray<{ value: ReadingFallback; label: string }> = [
+  { value: '', label: '默认衬线' },
+  { value: 'sans', label: '无衬线' },
+]
+
+function selectFallback(v: ReadingFallback): void {
+  fallbackPref.value = v
+  setFallbackPreference(v)
+}
+
+function onFallbackSegKeydown(e: KeyboardEvent): void {
+  if (!fallbackVisible.value) return
+  segKeydown(
+    e,
+    fallbackOptions.map((o) => o.value),
+    fallbackPref.value,
+    (v) => selectFallback(v as ReadingFallback),
+    fallbackGroup,
+  )
+}
+
 // 跨页签偏好同步（复检修复）：他页签改偏好必然广播 → 本页签 resync 重拉列表
-// （readingFontsRef 引用更新）→ 此时从 localStorage 全量重读四项偏好，
+// （readingFontsRef 引用更新）→ 此时从 localStorage 全量重读偏好，
 // 保证 seg 选中态与真实存储一致（否则残留他页签改动前的高亮）
 watch(readingFontsRef, () => {
   fontPref.value = getFontPreference()
   sizePref.value = getSizePreference()
   linePref.value = getLinePreference()
   scopePref.value = getScopePreference()
+  fallbackPref.value = getFallbackPreference()
 })
 
 // —— 导入字体：选文件 → 内联命名表单 → 上传（禁 window 弹窗，T2 同款内联交互） ——
@@ -258,10 +294,12 @@ function resetReading(): void {
   sizePref.value = 'md'
   linePref.value = 'normal'
   scopePref.value = 'all'
+  fallbackPref.value = ''
   setFontPreference('')
   setSizePreference('md')
   setLinePreference('normal')
   setScopePreference('all')
+  setFallbackPreference('')
 }
 
 function formatSize(bytes: number): string {
@@ -482,6 +520,32 @@ onMounted(load)
           </button>
         </div>
         <span v-if="!scopeEnabled" class="scope-hint">选中导入字体后生效</span>
+      </div>
+
+      <div v-if="fallbackVisible" class="reading-block">
+        <span class="reading-label">另一侧字体</span>
+        <div
+          ref="fallbackGroup"
+          class="theme-seg"
+          role="radiogroup"
+          aria-label="另一侧字体"
+          @keydown="onFallbackSegKeydown"
+        >
+          <button
+            v-for="opt in fallbackOptions"
+            :key="opt.value || 'serif'"
+            type="button"
+            role="radio"
+            class="theme-opt"
+            :class="{ active: fallbackPref === opt.value }"
+            :aria-checked="fallbackPref === opt.value"
+            :tabindex="fallbackPref === opt.value ? 0 : -1"
+            @click="selectFallback(opt.value)"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+        <span class="scope-hint">{{ fallbackHint }}</span>
       </div>
 
       <ul v-if="readingFonts.length > 0" class="font-list">

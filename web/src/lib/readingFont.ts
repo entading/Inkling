@@ -31,11 +31,15 @@ export type ReadingFontPref = '' | 'sans' | string
  * latin=仅英文（中文回落思源宋体）。实现 = 服务端按 unicode-range 过滤聚合 CSS，
  * 切换零成本（不分片产物不变）；仅对导入字体有意义，预设时置灰 */
 export type ReadingFontScope = 'all' | 'cjk' | 'latin'
+/** 另一侧字体（F1 追加方案 B）：scope=cjk|latin 时被导入字体让出的那侧用哪个栈——
+ * '' = 默认衬线栈（现状回落）；'sans' = 无衬线栈（var(--font-sans)）。scope=all 时无意义被忽略 */
+export type ReadingFallback = '' | 'sans'
 
 const FONT_KEY = 'en_tool:reading-font'
 const SIZE_KEY = 'en_tool:reading-size'
 const LINE_KEY = 'en_tool:reading-line'
 const SCOPE_KEY = 'en_tool:reading-font-scope'
+const FALLBACK_KEY = 'en_tool:reading-fallback'
 
 const SIZE_VALUES: readonly ReadingSize[] = ['sm', 'md', 'lg']
 const LINE_VALUES: readonly ReadingLine[] = ['tight', 'normal', 'loose']
@@ -177,6 +181,24 @@ export function setScopePreference(v: ReadingFontScope): void {
   broadcast()
 }
 
+export function getFallbackPreference(): ReadingFallback {
+  try {
+    const v = localStorage.getItem(FALLBACK_KEY)
+    if (v === 'sans') return v
+    if (v === '') return v
+  } catch { /* 隐私模式 */ }
+  return ''
+}
+
+export function setFallbackPreference(v: ReadingFallback): void {
+  try {
+    localStorage.setItem(FALLBACK_KEY, v)
+  } catch { /* 隐私模式 */ }
+  // 另一侧栈拼进 --font-serif：重应用（scope=all 或正文字体非导入时键值保留但不生效）
+  applyFontFamily(getFontPreference())
+  broadcast()
+}
+
 /** 启动应用（main.ts 调用）：与 index.html 防闪脚本同语义，幂等重设 + 非法值修正 */
 export function applyReadingPreferencesAtBoot(): void {
   document.documentElement.dataset.readingSize = getSizePreference()
@@ -205,7 +227,12 @@ function applyFontFamily(pref: ReadingFontPref): void {
     }
     return
   }
-  rootStyle.setProperty('--font-serif', `'${family}', ${base}`)
+  // 另一侧字体（方案 B）：scope=cjk|latin 时被让出的那侧按 fallback 偏好听栈——
+  // '' = 默认衬线栈（现状回落）；'sans' = 无衬线栈。scope=all 时导入字体全量接管，忽略 fallback
+  const scope = getScopePreference()
+  const tail =
+    scope !== 'all' && getFallbackPreference() === 'sans' ? 'var(--font-sans)' : base
+  rootStyle.setProperty('--font-serif', `'${family}', ${tail}`)
 }
 
 // ---------- @font-face 动态注入 ----------
