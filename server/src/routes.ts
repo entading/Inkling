@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import multipart from '@fastify/multipart'
 import fs from 'node:fs'
 import path from 'node:path'
 import { BOARDS, type Board } from './types.js'
@@ -19,6 +20,16 @@ import { LAN_STATE, buildServerInfo } from './settings.js'
 import { commitNoteDeletion, commitNotesBatch } from './gitCommit.js'
 import { getTagRegistry, upsertTag, removeTagFromRegistry, renameTagInRegistry } from './tagRegistry.js'
 import { surgeryNoteFile } from './tagSurgery.js'
+import {
+  FONTS_DIR,
+  aggregateFontCss,
+  createFontRecord,
+  detectFontFormat,
+  enqueueFontSplit,
+  getFont,
+  listFonts,
+  removeFont,
+} from './fontLibrary.js'
 
 /** 由 index.ts 注入：请求切换局域网监听（后台执行，先应答后 close→re-listen） */
 export interface ServerHooks {
@@ -51,6 +62,9 @@ const WINDOWS_RESERVED = new Set([
 // —— 标签管理（v1.1 T2）共用小工具 ————————————————————————————————
 
 const nfc = (s: string) => s.normalize('NFC')
+
+/** 导入字体文件大小上限：30 MB（中文整包字体普遍 10–20 MB，英文小字体数百 KB） */
+const MAX_FONT_BYTES = 30 * 1024 * 1024
 
 /** 词条是否携带某标签（NFC 归一化比较，与注册表键/tagColorIndex 查询口径一致） */
 function carriesTag(tags: string[], tagNfc: string): boolean {
@@ -127,6 +141,9 @@ function sortNotes(board: Board) {
 }
 
 export function registerRoutes(app: FastifyInstance, hooks?: ServerHooks): void {
+  // F1 导入字体：multipart 上传插件（fileSize 超限在 handler 转 413；随 LAN 重建重注册）
+  app.register(multipart, { limits: { fileSize: MAX_FONT_BYTES } })
+
   app.get('/api/boards', async () => boardCounts())
 
   app.get('/api/notes', async (req, reply) => {
@@ -369,6 +386,102 @@ export function registerRoutes(app: FastifyInstance, hooks?: ServerHooks): void 
     }
     // 删除成功后后台自动 git 提交（不阻塞响应，失败仅警告）
     commitNoteDeletion(board, slug)
+    return { ok: true }
+  })
+
+  // —— 导入字体库（F1 阅读字体管理）——————————————————————————————
+  // 上传 → 落盘 + pending manifest → 立即应答 → 后台子进程分片（fontLibrary 串行队列）；
+  // 前端轮询 GET /api/fonts 直到 ready/failed。全程不触碰 notes/，零 git 参与。
+
+  app.get('/api/fonts', async () => listFonts())
+
+  app.post('/api/fonts', async (req, reply) => {
+    let name = ''
+    let fileBuf: Buffer | null = null
+    try {
+      for await (const part of req.parts()) {
+        if (part.type === 'file') {
+          const buf = await part.toBuffer()
+          if (part.fieldname === 'file') fileBuf = buf
+        } else if (part.fieldname === 'name') {
+          name = String(part.value ?? '')
+        }
+      }
+    } catch (err) {
+      // 超限：multipart 抛 RequestFileTooLargeError（不同版本 code 不一，按消息双保险匹配）
+      const msg = err instanceof Error ? err.message : String(err)
+      if ((err as { code?: string }).code === 'FST_PART_FILE_TOO_LARGE' || /too large/i.test(msg)) {
+        return reply.code(413).send({ error: `字体文件超过上限（${MAX_FONT_BYTES / 1024 / 1024} MB）` })
+      }
+      req.log.error(err)
+      return reply.code(400).send({ error: `上传解析失败：${msg}` })
+    }
+
+    const trimmed = name.trim()
+    if (trimmed.length < 1 || trimmed.length > 32) {
+      return reply.code(400).send({ error: '字体名称必须为 1–32 个字符' })
+    }
+    if (!fileBuf) {
+      return reply.code(400).send({ error: '缺少字体文件（multipart 字段名须为 file）' })
+    }
+    // 魔数判定格式（与扩展名无关）：woff/ttc 等一律拒收
+    const format = detectFontFormat(fileBuf)
+    if (!format) {
+      return reply.code(400).send({ error: '不支持的字体格式：仅收 ttf / otf / woff2（woff / ttc 拒收）' })
+    }
+
+    try {
+      const record = createFontRecord(trimmed, format, fileBuf.length)
+      fs.writeFileSync(path.join(FONTS_DIR, record.id, `source.${format}`), fileBuf)
+      // 先应答后台分片（E1）：分片在独立子进程跑（E2），完成后 ready/failed 由 manifest 呈现
+      enqueueFontSplit(record.id)
+      return record
+    } catch (err) {
+      req.log.error(err)
+      return reply.code(500).send({ error: `字体入库失败：${err instanceof Error ? err.message : String(err)}` })
+    }
+  })
+
+  app.get('/api/fonts/css', async (_req, reply) => {
+    return reply.type('text/css; charset=utf-8').send(aggregateFontCss())
+  })
+
+  app.get('/api/fonts/:id/file/:name', async (req, reply) => {
+    const { id, name } = req.params as { id: string; name: string }
+    const font = getFont(id)
+    if (!font || font.status !== 'ready') {
+      return reply.code(404).send({ error: '字体不存在或未就绪' })
+    }
+    // 分片名为 [hash:6].woff2（fontSplit 产出）：白名单字符 + 显式拒 '..' + 包含校验双保险
+    if (!/^[A-Za-z0-9._-]+$/.test(name) || name.includes('..')) {
+      return reply.code(400).send({ error: '非法文件名' })
+    }
+    const chunksDir = path.join(FONTS_DIR, id, 'chunks')
+    const filePath = path.resolve(chunksDir, name)
+    if (!filePath.startsWith(chunksDir + path.sep)) {
+      return reply.code(400).send({ error: '非法文件名' })
+    }
+    if (!fs.existsSync(filePath)) {
+      return reply.code(404).send({ error: '分片文件不存在' })
+    }
+    // 文件名含内容哈希：immutable 长缓存安全
+    return reply
+      .type('font/woff2')
+      .header('Cache-Control', 'public, max-age=31536000, immutable')
+      .send(fs.createReadStream(filePath))
+  })
+
+  app.delete('/api/fonts/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    if (!getFont(id)) {
+      return reply.code(404).send({ error: '字体不存在' })
+    }
+    try {
+      removeFont(id)
+    } catch (err) {
+      req.log.error(err)
+      return reply.code(500).send({ error: `删除失败：${err instanceof Error ? err.message : String(err)}` })
+    }
     return { ok: true }
   })
 }

@@ -79,6 +79,21 @@ export interface TagRenameResult {
   warnings: TagWarning[]
 }
 
+/** 导入字体条目（F1）：服务端 data/fonts/<id>/manifest.json 的投影 */
+export interface FontEntry {
+  id: string
+  /** 用户可见显示名 */
+  name: string
+  /** 内部 @font-face family 名（inkling-font-<id>） */
+  family: string
+  status: 'pending' | 'ready' | 'failed'
+  format: 'ttf' | 'otf' | 'woff2'
+  sizeBytes: number
+  chunkCount: number
+  error?: string
+  createdAt: string
+}
+
 /** API 错误：message 为服务端 error 字段，status 供调用方区分（如新建 409 冲突） */
 export class ApiError extends Error {
   status: number
@@ -151,4 +166,14 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ newTag }),
     }),
+  fonts: () => fetchJson<FontEntry[]>('/api/fonts'),
+  /** multipart 上传：FormData 由浏览器自动设 boundary，勿手动设 Content-Type（F1） */
+  importFont: (name: string, file: File) => {
+    const form = new FormData()
+    form.append('name', name)
+    form.append('file', file)
+    return fetchJson<FontEntry>('/api/fonts', { method: 'POST', body: form })
+  },
+  deleteFont: (id: string) =>
+    fetchJson<{ ok: boolean }>(`/api/fonts/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 }

@@ -19,6 +19,16 @@
               : 'light'
         }
         document.documentElement.dataset.theme = pref
+        // 阅读排版档位防闪（F1，E5 范围=字号/行距；字体族是 webfont 异步加载不在此列）：
+        // 与 lib/readingFont.ts 同键同语义，默认档（md/normal）无需设属性
+        try {
+          var size = localStorage.getItem('en_tool:reading-size')
+          if (size === 'sm' || size === 'lg') document.documentElement.dataset.readingSize = size
+          var line = localStorage.getItem('en_tool:reading-line')
+          if (line === 'tight' || line === 'loose') document.documentElement.dataset.readingLine = line
+        } catch (e) {
+          /* 隐私模式等：走默认档 */
+        }
       })()
     </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />

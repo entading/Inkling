@@ -78,6 +78,10 @@ textarea {
   --text-2xl: 1.7rem;
   /* 正文（阅读排版 §3）：17px，仅 .note-body 使用 */
   --text-body: 1.0625rem;
+  /* 阅读排版档位生效值（F1）：.note-body 实际引用——默认随 --text-body，
+     data-reading-* 属性档位在下方覆盖；与 UI 层字号令牌完全解耦 */
+  --note-body-size: var(--text-body);
+  --note-line-height: 1.8;
 
   /* 板块个性色（主色 + 柔和底；M2' 起在组件中使用） */
   --board-vocab: #3b82f6;
@@ -151,6 +155,22 @@ textarea {
   --z-drop: 30;
   --z-nav: 40;
   --z-float: 50;
+}
+
+/* 阅读排版档位（F1）：属性由 index.html 防闪脚本与 lib/readingFont.ts 两处写入。
+   移动端（≤767px）档位收窄等比（D7 拍板）：sm/lg 14.5/17.5px，标准档 = 325df61 拍板的 16px */
+[data-reading-size='sm'] { --note-body-size: 0.90625rem; } /* 14.5px */
+[data-reading-size='lg'] { --note-body-size: 1.1875rem; }  /* 19px */
+[data-reading-line='tight'] { --note-line-height: 1.6; }
+[data-reading-line='loose'] { --note-line-height: 2; }
+
+@media (max-width: 767px) {
+  :root {
+    --note-body-size: 1rem; /* 16px（325df61 用户拍板） */
+  }
+  /* 同特异性与 :root，靠声明顺序压过（属性规则必须置后） */
+  [data-reading-size='sm'] { --note-body-size: 0.90625rem; } /* 14.5px */
+  [data-reading-size='lg'] { --note-body-size: 1.09375rem; } /* 17.5px */
 }
 
 /* 深色主题：全靠令牌覆盖，组件内禁止 prefers-color-scheme 分支与散写 hex/rgba */
