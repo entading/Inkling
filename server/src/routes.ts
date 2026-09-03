@@ -442,8 +442,14 @@ export function registerRoutes(app: FastifyInstance, hooks?: ServerHooks): void 
     }
   })
 
-  app.get('/api/fonts/css', async (_req, reply) => {
-    return reply.type('text/css; charset=utf-8').send(aggregateFontCss())
+  app.get('/api/fonts/css', async (req, reply) => {
+    // scope 过滤（F1 追加）：cjk=仅中文片 / latin=仅英文片 / 其余值回落 all（css 资源宽松语义）
+    const { scope } = req.query as { scope?: string }
+    const s = scope === 'cjk' || scope === 'latin' ? scope : 'all'
+    return reply
+      .type('text/css; charset=utf-8')
+      .header('Cache-Control', 'no-cache') // 内容随导入/删除/过滤变化，禁启发式缓存
+      .send(aggregateFontCss(s))
   })
 
   app.get('/api/fonts/:id/file/:name', async (req, reply) => {
