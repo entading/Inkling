@@ -48,8 +48,8 @@ export async function findNote(board: Board, slug: string): Promise<NoteDetail |
   return index.find((n) => n.board === board && n.slug === slug) ?? null
 }
 
-const BASE_KEYS: FuseOptionKey<NoteDetail>[] = ['title', 'tags']
-const BODY_KEYS: FuseOptionKey<NoteDetail>[] = ['title', 'tags', 'body']
+const BASE_KEYS: FuseOptionKey<NoteDetail>[] = ['title', 'tags', 'source']
+const BODY_KEYS: FuseOptionKey<NoteDetail>[] = ['title', 'tags', 'source', 'body']
 
 export function buildFuse<T>(items: T[], keys: FuseOptionKey<T>[]): Fuse<T> {
   return new Fuse(items, {

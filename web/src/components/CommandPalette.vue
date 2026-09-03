@@ -55,7 +55,7 @@ async function ensureFuse(): Promise<void> {
     const notes = await getSearchIndex()
     if (notes !== lastFuseSource) {
       lastFuseSource = notes
-      fuse.value = buildFuse(notes, ['title', 'tags', 'slug'])
+      fuse.value = buildFuse(notes, ['title', 'tags', 'slug', 'source'])
     }
     if (query.value.trim()) runSearch()
   } catch {
