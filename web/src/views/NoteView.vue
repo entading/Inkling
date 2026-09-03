@@ -444,7 +444,7 @@ async function refreshMissingLinks(): Promise<void> {
 
     <article v-else-if="note" class="note">
       <RouterLink
-        :to="`/v/${route.params.board}`"
+        :to="`/${route.params.board}`"
         class="board-crumb"
         :aria-label="`返回${BOARD_LABELS[route.params.board as Board]}板块`"
       >
