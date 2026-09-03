@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import TagBadge from '../components/TagBadge.vue'
 import MarkdownViewer, { type TocItem } from '../components/MarkdownViewer.vue'
+import Icon, { type IconName } from '../components/Icon.vue'
 import Skeleton from '../components/Skeleton.vue'
 import { api, type Board, type NoteDetailRaw, type NoteMeta } from '../api'
 import { getBacklinks, stripCodeText, type Backlink } from '../lib/backlinks'
@@ -17,6 +18,16 @@ const BOARD_PAGE_LABELS: Record<Board, string> = {
   sentence: '长难句 · Sentence',
   grammar: '语法 · Grammar',
 }
+
+/** 返回板块图标（与底部导航/侧栏的板块图标同语言，A+C 用户拍板） */
+const BOARD_ICONS: Record<Board, IconName> = {
+  vocab: 'book',
+  phrase: 'link',
+  sentence: 'align-left',
+  grammar: 'graduation-cap',
+}
+
+const board = computed(() => route.params.board as Board)
 
 const route = useRoute()
 const router = useRouter()
@@ -443,13 +454,6 @@ async function refreshMissingLinks(): Promise<void> {
     </div>
 
     <article v-else-if="note" class="note">
-      <RouterLink
-        :to="`/${route.params.board}`"
-        class="board-crumb"
-        :aria-label="`返回${BOARD_LABELS[route.params.board as Board]}板块`"
-      >
-        ← {{ BOARD_PAGE_LABELS[route.params.board as Board] }}
-      </RouterLink>
       <header class="note-header">
         <div class="note-head-main">
           <div class="title-row">
@@ -469,6 +473,15 @@ async function refreshMissingLinks(): Promise<void> {
               </svg>
             </button>
             <p v-if="note.ipa" class="ipa">{{ note.ipa }}</p>
+      <RouterLink
+        :to="`/${board}`"
+        class="board-crumb"
+        :aria-label="`返回${BOARD_LABELS[board]}板块`"
+        title="返回板块"
+      >
+        <Icon :name="BOARD_ICONS[board]" class="crumb-icon" :size="16" />
+        <span class="crumb-text">← {{ BOARD_PAGE_LABELS[board] }}</span>
+      </RouterLink>
           </div>
           <div class="note-tags">
             <TagBadge v-for="tag in note.tags" :key="tag" :tag="tag" />
@@ -856,18 +869,32 @@ async function refreshMissingLinks(): Promise<void> {
   gap: var(--space-4);
 }
 
-/* 返回板块面包屑（用户拍板方案 A）：卡片顶部独占一行，secondary→hover accent
-   对齐编辑页 .back-link 语言；RouterLink 在 header 外避免挤入横向 flex */
+/* 返回板块（用户拍板 A+C）：面包屑移入 title-row 参与布局流（结构性防与标题重叠）。
+   桌面 = order -1 + 全宽独占首行的文字面包屑（形态同前）；移动 = 排行尾的板块图标
+   圆钮（icon 与底部导航同语言，aria/title 承载「返回板块」语义） */
 .board-crumb {
-  display: inline-block;
+  order: -1;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   margin-bottom: var(--space-2);
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
   text-decoration: none;
-  transition: color var(--duration-fast) var(--ease-out);
+  transition: color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
 }
 
 .board-crumb:hover {
+  color: var(--color-accent);
+}
+
+.board-crumb .crumb-icon {
+  display: none;
+}
+
+.board-crumb:hover .crumb-icon {
   color: var(--color-accent);
 }
 
@@ -1152,6 +1179,28 @@ async function refreshMissingLinks(): Promise<void> {
      上下保持 16px 呼吸。骨架同 padding 贴合真实文本 */
   .note {
     padding: var(--space-4) var(--space-3);
+  }
+
+  /* 返回板块图标形态（用户拍板 A+C）：排行尾右端、圆形热区，icon 与底部
+     导航同语言；文字形态隐藏（aria/title 承载语义） */
+  .board-crumb {
+    order: 3;
+    width: auto;
+    margin: 0 0 0 auto;
+    padding: 6px;
+    border-radius: var(--radius-full);
+  }
+
+  .board-crumb .crumb-text {
+    display: none;
+  }
+
+  .board-crumb .crumb-icon {
+    display: block;
+  }
+
+  .board-crumb:hover {
+    background: var(--color-accent-soft);
   }
 
   .note-skeleton {
