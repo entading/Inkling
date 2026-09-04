@@ -1,6 +1,7 @@
 import { shallowRef } from 'vue'
 import { api, type TagRegistry } from '../api'
-import { invalidateSearchIndex } from './search'
+import { aggregateTags, invalidateSearchIndex } from './search'
+import { tagColorIndex } from './tagColor'
 
 /**
  * 标签注册表客户端缓存（v1.1）：Promise 缓存照 getSearchIndex 模式；额外维护
@@ -84,6 +85,28 @@ export async function renameTag(tag: string, newTag: string): Promise<ReturnType
   }
   invalidateSearchIndex()
   return res
+}
+
+/**
+ * 一键批量注册携带标签（G1.5）：聚合当前词条携带的标签，过滤已注册，颜色取
+ * tagColorIndex（未注册 = djb2 回落色）——注册前后显示色零变化（哈希唯一来源
+ * 保持在本库依赖的 tagColor.ts，不传服务端第二份 hash）。注册表应用走序列号
+ * 守卫 + 广播（同 upsertTag）；只写注册表不改词条，无需失效搜索索引。
+ * 返回实际新增的标签名列表。
+ */
+export async function registerCarriedTags(): Promise<string[]> {
+  const seq = ++mutationSeq
+  const [agg, reg] = await Promise.all([aggregateTags(), getTagRegistry()])
+  const items = agg
+    .filter((t) => !Object.prototype.hasOwnProperty.call(reg, t.tag.normalize('NFC')))
+    .map((t) => ({ tag: t.tag, color: tagColorIndex(t.tag) }))
+  if (items.length === 0) return []
+  const res = await api.registerCarriedTags(items)
+  if (seq === mutationSeq) {
+    apply(res.registry)
+    broadcast()
+  }
+  return res.registered
 }
 
 // —— 跨页签/跨设备同步（全面审查 B3 定稿，轻量方案）：

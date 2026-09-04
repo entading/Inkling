@@ -135,6 +135,12 @@ export interface TagRenameResult {
   warnings: TagWarning[]
 }
 
+/** 批量注册携带标签响应（G1.5）：registered = 实际新增的键（已存在条目绝不覆盖） */
+export interface TagBulkRegisterResult {
+  registry: TagRegistry
+  registered: string[]
+}
+
 /** 导入字体条目（F1）：服务端 data/fonts/<id>/manifest.json 的投影 */
 export interface FontEntry {
   id: string
@@ -240,6 +246,13 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ newTag }),
+    }),
+  /** 批量注册携带标签（G1.5）：颜色由前端按当前显示色（djb2 回落）传入，视觉零变化 */
+  registerCarriedTags: (items: Array<{ tag: string; color: number }>) =>
+    fetchJson<TagBulkRegisterResult>('/api/tags/register-carried', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
     }),
   fonts: () => fetchJson<FontEntry[]>('/api/fonts'),
   /** multipart 上传：FormData 由浏览器自动设 boundary，勿手动设 Content-Type（F1） */
