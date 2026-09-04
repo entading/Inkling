@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
-import { api, type FontEntry, type ServerInfo } from '../api'
+import {
+  api,
+  type Board,
+  type DataDirCheckResult,
+  type DataDirEnableResult,
+  type DataDirInfo,
+  type FontEntry,
+  type ServerInfo,
+} from '../api'
 import { useTheme, type ThemePreference } from '../lib/theme'
 import {
   deleteFont as deleteReadingFont,
@@ -343,6 +351,114 @@ onBeforeUnmount(() => {
 const pending = ref(false)
 const fail = ref('')
 
+// ---------- 数据目录（G1）：目录切换（重启生效）+ 版本跟踪三态；写操作仅本机，LAN 得 403 ----------
+
+const DD_BOARD_LABELS: Record<Board, string> = {
+  vocab: '词汇',
+  phrase: '短语',
+  sentence: '长难句',
+  grammar: '语法',
+}
+
+const dataDir = ref<DataDirInfo | null>(null)
+/** 内联面板状态机（TagDetail 同款互斥模式，禁 window.confirm） */
+const ddPanel = ref<'none' | 'switch' | 'git'>('none')
+const ddPathInput = ref('')
+const ddChecking = ref(false)
+const ddCheck = ref<DataDirCheckResult | null>(null)
+const ddCheckError = ref('')
+const ddApplying = ref(false)
+const ddApplyError = ref('')
+const ddApplied = ref(false)
+const ddEnabling = ref(false)
+const ddEnableError = ref('')
+const ddEnableResult = ref<DataDirEnableResult | null>(null)
+
+function resetDdOpState(): void {
+  ddCheck.value = null
+  ddCheckError.value = ''
+  ddApplyError.value = ''
+  ddApplied.value = false
+  ddEnableError.value = ''
+  ddEnableResult.value = null
+}
+
+function toggleDdPanel(which: 'switch' | 'git'): void {
+  if (ddPanel.value === which) {
+    ddPanel.value = 'none'
+    return
+  }
+  resetDdOpState()
+  ddPanel.value = which
+  if (which === 'switch') ddPathInput.value = ''
+}
+
+async function runCheck(): Promise<void> {
+  const raw = ddPathInput.value.trim()
+  if (!raw || ddChecking.value) return
+  ddChecking.value = true
+  ddCheckError.value = ''
+  ddCheck.value = null
+  ddApplied.value = false
+  try {
+    ddCheck.value = await api.checkDataDir(raw)
+  } catch (e) {
+    ddCheckError.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    ddChecking.value = false
+  }
+}
+
+/** 可确认切换：检查通过（invalid 仅限「不存在且将创建」），当前目录短路禁用 */
+const ddCanApply = computed(() => {
+  const c = ddCheck.value
+  if (!c || c.isCurrent) return false
+  if (c.verdict === 'invalid') return c.canCreate === true
+  return true
+})
+
+async function applyDataDir(): Promise<void> {
+  const c = ddCheck.value
+  if (!c || !ddCanApply.value || ddApplying.value) return
+  ddApplying.value = true
+  ddApplyError.value = ''
+  try {
+    const res = await api.applyDataDir(c.path, {
+      createMissing: c.verdict === 'empty' || c.verdict === 'needs-normalize',
+      createDir: c.canCreate === true,
+    })
+    dataDir.value = res.dataDir
+    ddApplied.value = true
+  } catch (e) {
+    ddApplyError.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    ddApplying.value = false
+  }
+}
+
+/** 恢复默认目录：预填默认路径并自动检查（D6 可随时切回） */
+function prefillDefault(): void {
+  if (!dataDir.value) return
+  ddPathInput.value = dataDir.value.defaultNotesDir
+  void runCheck()
+}
+
+async function enableGit(): Promise<void> {
+  if (ddEnabling.value) return
+  ddEnabling.value = true
+  ddEnableError.value = ''
+  try {
+    ddEnableResult.value = await api.enableGitTracking()
+    if (dataDir.value && ddEnableResult.value) {
+      dataDir.value = { ...dataDir.value, git: ddEnableResult.value.git }
+    }
+  } catch (e) {
+    ddEnableError.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    ddEnabling.value = false
+  }
+}
+
 // ---------- 发音（TTS）：纯浏览器端偏好，voice 存 localStorage 不走 /api/settings ----------
 
 const ttsSupported = isTtsSupported()
@@ -389,7 +505,10 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    info.value = await api.serverInfo()
+    // data-dir 拉取失败不阻塞整页（卡片降级为仅显示路径）
+    const [si, dd] = await Promise.all([api.serverInfo(), api.dataDir().catch(() => null)])
+    info.value = si
+    dataDir.value = dd
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -733,6 +852,165 @@ onMounted(load)
         <h2 class="card-title">数据目录</h2>
         <p class="desc">笔记以 Markdown 文件保存在以下目录，可整体迁移或手工增删：</p>
         <code class="path">{{ info.notesDir }}</code>
+
+        <template v-if="dataDir">
+          <p v-if="dataDir.configuredMissing" class="dd-warning" role="alert">
+            配置的数据目录不存在，已回退默认目录；目录恢复后重启服务即可生效。
+          </p>
+          <p v-else-if="dataDir.pendingRestart" class="dd-warning">
+            已保存新目录：{{ dataDir.persistedDir }}——重启服务后生效，各设备刷新页面即可看到新数据。
+          </p>
+
+          <p v-if="dataDir.git.tracked && dataDir.git.hasCommits" class="dd-git-line">
+            版本跟踪：git 已启用（仓库根 <code class="dd-git-root">{{ dataDir.git.root }}</code
+            >）
+          </p>
+          <p v-else-if="dataDir.git.tracked" class="dd-warning" role="alert">
+            已初始化 git 仓库但尚无提交（缺少 git 身份配置？），删除与标签批量操作暂无法通过 git 找回。
+          </p>
+          <p v-else class="dd-warning">
+            版本跟踪：未启用——删除词条与标签批量操作不留痕，删除后无法找回。
+          </p>
+
+          <div class="dd-actions">
+            <button
+              v-if="!dataDir.git.tracked && !dataDir.pendingRestart"
+              type="button"
+              class="dd-btn"
+              :class="{ active: ddPanel === 'git' }"
+              :aria-expanded="ddPanel === 'git'"
+              @click="toggleDdPanel('git')"
+            >
+              启用版本跟踪
+            </button>
+            <button
+              type="button"
+              class="dd-btn"
+              :class="{ active: ddPanel === 'switch' }"
+              :aria-expanded="ddPanel === 'switch'"
+              @click="toggleDdPanel('switch')"
+            >
+              更改目录
+            </button>
+          </div>
+
+          <div v-if="ddPanel === 'git'" class="dd-panel">
+            <p class="dd-panel-title">在当前数据目录启用版本跟踪？</p>
+            <p class="dd-panel-hint">
+              将执行 git init，并对目录内已有文件做一次全量基线提交。已有文件不会被修改；
+              此后删除词条与标签批量操作会自动留痕，可通过 git 历史找回。
+            </p>
+            <p v-if="ddEnableError" class="error" role="alert">{{ ddEnableError }}</p>
+            <p
+              v-if="ddEnableResult && !ddEnableResult.committed && ddEnableResult.warning"
+              class="dd-warning"
+              role="alert"
+            >
+              {{ ddEnableResult.warning }}
+            </p>
+            <div class="dd-panel-actions">
+              <button type="button" class="dd-btn" @click="toggleDdPanel('git')">取消</button>
+              <button type="button" class="dd-btn-primary" :disabled="ddEnabling" @click="enableGit">
+                {{ ddEnabling ? '启用中…' : '确认启用' }}
+              </button>
+            </div>
+          </div>
+
+          <div v-if="ddPanel === 'switch'" class="dd-panel">
+            <div class="dd-switch-row">
+              <input
+                v-model="ddPathInput"
+                class="dd-input"
+                type="text"
+                placeholder="输入数据目录绝对路径，如 D:\MyNotes"
+                aria-label="新数据目录路径"
+                @keydown.enter.prevent="runCheck"
+              />
+              <button
+                type="button"
+                class="dd-btn"
+                :disabled="ddChecking || !ddPathInput.trim()"
+                @click="runCheck"
+              >
+                {{ ddChecking ? '检查中…' : '检查' }}
+              </button>
+            </div>
+            <p v-if="dataDir && !dataDir.isDefault" class="dd-panel-hint">
+              <button type="button" class="dd-linklike" @click="prefillDefault">
+                恢复默认目录（{{ dataDir.defaultNotesDir }}）
+              </button>
+            </p>
+            <p v-if="ddCheckError" class="error" role="alert">{{ ddCheckError }}</p>
+
+            <template v-if="ddCheck">
+              <p v-if="ddCheck.isCurrent" class="dd-panel-hint">这就是当前数据目录，无需切换。</p>
+
+              <template v-else>
+                <div
+                  v-if="ddCheck.nodeModulesPresent || ddCheck.isDriveRoot"
+                  class="dd-warning"
+                  role="alert"
+                >
+                  {{
+                    ddCheck.nodeModulesPresent
+                      ? '目标目录包含 node_modules，监听与索引会显著变慢，不建议。'
+                      : '目标是盘根目录，板块目录将建在盘根，不建议。'
+                  }}
+                </div>
+
+                <p v-if="ddCheck.verdict === 'invalid'" class="dd-panel-hint">
+                  {{ ddCheck.canCreate ? `目录不存在，确认切换后将创建：${ddCheck.path}` : ddCheck.reason }}
+                </p>
+                <template v-else>
+                  <p v-if="ddCheck.verdict === 'empty'" class="dd-panel-hint">
+                    空目录：确认切换并重启服务后，将初始化词汇 / 短语 / 长难句 / 语法四个板块目录。
+                  </p>
+                  <p v-else-if="ddCheck.verdict === 'needs-normalize'" class="dd-panel-hint">
+                    缺少板块目录：{{ ddCheck.missingBoards?.map((b) => DD_BOARD_LABELS[b as Board]).join(' / ') }}。确认后将只创建缺失目录，已有文件不会被移动或删除。
+                  </p>
+
+                  <ul class="dd-stats">
+                    <li v-for="b in ddCheck.boards" :key="b.board">
+                      {{ DD_BOARD_LABELS[b.board] }}：{{ b.mdCount }} 条{{
+                        b.nonMdCount ? `（另有 ${b.nonMdCount} 个非 md 文件，不显示）` : ''
+                      }}
+                    </li>
+                  </ul>
+                  <p v-if="ddCheck.looseRootMd" class="dd-panel-hint">
+                    根目录散落 {{ ddCheck.looseRootMd }} 个 .md，不会被索引；需要时可手动移入板块目录。
+                  </p>
+                  <p v-if="ddCheck.uppercaseMd" class="dd-panel-hint">
+                    {{ ddCheck.uppercaseMd }} 个大写 .MD 扩展名文件不会被索引。
+                  </p>
+                  <p v-if="ddCheck.otherEntries.length" class="dd-panel-hint">
+                    其他条目：{{ ddCheck.otherEntries.map((e) => e.name).join('、') }}（不影响加载）。
+                  </p>
+                  <p v-if="!ddCheck.git.tracked" class="dd-panel-hint">
+                    目标目录暂未启用版本跟踪，切换后可在本页开启。
+                  </p>
+
+                  <p class="dd-impact">切换后，当前目录的笔记将不再显示（文件原样保留，可随时切回）。</p>
+                </template>
+
+                <p v-if="ddApplyError" class="error" role="alert">{{ ddApplyError }}</p>
+                <p v-if="ddApplied" class="dd-success" role="status">
+                  已保存。重启服务后生效，各设备刷新页面即可看到新数据。
+                </p>
+                <div class="dd-panel-actions">
+                  <button type="button" class="dd-btn" @click="toggleDdPanel('switch')">取消</button>
+                  <button
+                    type="button"
+                    class="dd-btn-primary"
+                    :disabled="!ddCanApply || ddApplying"
+                    @click="applyDataDir"
+                  >
+                    {{ ddApplying ? '切换中…' : '确认切换' }}
+                  </button>
+                </div>
+              </template>
+            </template>
+          </div>
+        </template>
       </section>
 
       <section class="card">
@@ -1391,5 +1669,174 @@ onMounted(load)
 
 .reset-btn:hover {
   color: var(--color-text);
+}
+
+/* ---------- 数据目录（G1） ---------- */
+
+.dd-warning {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+  border-radius: var(--radius-md);
+}
+
+.dd-git-line {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.dd-git-root {
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.dd-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.dd-btn {
+  padding: var(--space-2) var(--space-4);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
+}
+
+.dd-btn:hover:not(:disabled) {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.dd-btn.active {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+.dd-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.dd-btn-primary {
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.dd-btn-primary:hover:not(:disabled) {
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  filter: brightness(1.05);
+}
+
+.dd-panel {
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.dd-panel-title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.dd-panel-hint {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+}
+
+.dd-switch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.dd-input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.dd-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.dd-linklike {
+  padding: 0;
+  font-family: inherit;
+  font-size: var(--text-xs);
+  color: var(--color-accent);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 3px;
+}
+
+.dd-stats {
+  margin: 0;
+  padding-left: 1.4em;
+  font-size: var(--text-xs);
+  line-height: 1.8;
+  color: var(--color-text-secondary);
+}
+
+.dd-impact {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  color: var(--color-warning);
+}
+
+.dd-success {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+}
+
+.dd-panel-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+/* 按压反馈（§6）：全部新增动画统一包在 no-preference 内 */
+@media (prefers-reduced-motion: no-preference) {
+  .dd-btn:active,
+  .dd-btn-primary:active {
+    transform: scale(0.98);
+  }
 }
 </style>
