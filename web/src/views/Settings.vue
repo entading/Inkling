@@ -917,7 +917,7 @@ onMounted(load)
             </p>
             <div class="dd-panel-actions">
               <button type="button" class="dd-btn" @click="toggleDdPanel('git')">取消</button>
-              <button type="button" class="dd-btn-primary" :disabled="ddEnabling" @click="enableGit">
+              <button type="button" class="dd-btn dd-btn-primary" :disabled="ddEnabling" @click="enableGit">
                 {{ ddEnabling ? '启用中…' : '确认启用' }}
               </button>
             </div>
@@ -1009,14 +1009,14 @@ onMounted(load)
                     <button type="button" class="dd-btn" @click="toggleDdPanel('switch')">取消</button>
                     <button
                       type="button"
-                      class="dd-btn-primary"
+                      class="dd-btn dd-btn-primary"
                       :disabled="!ddCanApply || ddApplying"
                       @click="applyDataDir"
                     >
                       {{ ddApplying ? '切换中…' : '确认切换' }}
                     </button>
                   </template>
-                  <button v-else type="button" class="dd-btn-primary" @click="closeDdPanel">完成</button>
+                  <button v-else type="button" class="dd-btn dd-btn-primary" @click="closeDdPanel">完成</button>
                 </div>
               </template>
             </template>
