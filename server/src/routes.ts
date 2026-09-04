@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import multipart from '@fastify/multipart'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -14,6 +14,14 @@ import {
   removeNote,
   noteFilePath,
 } from './scanner.js'
+import { persistNotesDir } from './appConfig.js'
+import {
+  getDataDirInfo,
+  probeDir,
+  enableGitTracking,
+  DataDirError,
+  type ProbeResult,
+} from './dataDir.js'
 import { buildTemplate } from './templates.js'
 import { LAN_STATE, buildServerInfo } from './settings.js'
 import { commitNoteDeletion, commitNotesBatch } from './gitCommit.js'
@@ -132,6 +140,22 @@ function sortNotes(board: Board) {
   return notes.sort((a, b) => b.updated.localeCompare(a.updated))
 }
 
+/** 数据目录操作仅限本机（G1 D5）：可影响主机任意路径，局域网客户端一律 403 */
+const DATA_DIR_LOCAL_ONLY = '数据目录操作仅限本机使用'
+
+function isLocalRequest(req: FastifyRequest): boolean {
+  const raw = req.ip ?? ''
+  const ip = raw.startsWith('::ffff:') ? raw.slice(7) : raw
+  return ip === '127.0.0.1' || ip === '::1'
+}
+
+/** 数据目录三端点共用的错误收尾：DataDirError 按携带状态码应答，其余记日志转 500 */
+function replyDataDirError(req: FastifyRequest, reply: FastifyReply, err: unknown, prefix: string): FastifyReply {
+  if (err instanceof DataDirError) return reply.code(err.status).send({ error: err.message })
+  req.log.error(err)
+  return reply.code(500).send({ error: `${prefix}：${err instanceof Error ? err.message : String(err)}` })
+}
+
 export function registerRoutes(app: FastifyInstance, hooks?: ServerHooks): void {
   // F1 导入字体：multipart 上传插件（fileSize 超限在 handler 转 413；随 LAN 重建重注册）
   app.register(multipart, { limits: { fileSize: MAX_FONT_BYTES } })
@@ -186,6 +210,95 @@ export function registerRoutes(app: FastifyInstance, hooks?: ServerHooks): void 
     // 应答反映目标状态；若切换失败服务端会回滚，前端核对 /api/server-info 提示。
     hooks?.toggleLan(body.lanEnabled)
     return buildServerInfo(body.lanEnabled)
+  })
+
+  // —— 数据目录管理（G1）：GET 公开（server-info 本就下发 notesDir，口径一致）；
+  //    三个 POST 仅限本机（D5），注册在 registerRoutes 内随 LAN 切换重建存活。
+  //    apply 只持久化配置不改运行时（D1 重启生效）；规范化为附加式（D2）。
+  app.get('/api/data-dir', async () => getDataDirInfo())
+
+  app.post('/api/data-dir/check', async (req, reply) => {
+    if (!isLocalRequest(req)) return reply.code(403).send({ error: DATA_DIR_LOCAL_ONLY })
+    const body = req.body as { path?: unknown } | null | undefined
+    if (!body || typeof body.path !== 'string') {
+      return reply.code(400).send({ error: 'body 必须为 { path: string }' })
+    }
+    try {
+      return await probeDir(body.path)
+    } catch (err) {
+      return replyDataDirError(req, reply, err, '检查失败')
+    }
+  })
+
+  app.post('/api/data-dir/apply', async (req, reply) => {
+    if (!isLocalRequest(req)) return reply.code(403).send({ error: DATA_DIR_LOCAL_ONLY })
+    const body = req.body as { path?: unknown; createMissing?: unknown; createDir?: unknown } | null | undefined
+    if (!body || typeof body.path !== 'string') {
+      return reply.code(400).send({ error: 'body 必须为 { path: string }' })
+    }
+    let probe: ProbeResult
+    try {
+      probe = await probeDir(body.path)
+    } catch (err) {
+      return replyDataDirError(req, reply, err, '检查失败')
+    }
+    if (probe.verdict === 'invalid') {
+      return reply.code(400).send({ error: probe.reason ?? '目录不符合要求' })
+    }
+    if (probe.isCurrent) {
+      return reply.code(400).send({ error: '目标目录即当前数据目录，无需切换' })
+    }
+    const target = probe.path
+    let createdDir = false
+    if (probe.canCreate) {
+      if (body.createDir !== true) {
+        return reply.code(400).send({ error: `目录不存在：${target}` })
+      }
+      try {
+        fs.mkdirSync(target, { recursive: true })
+      } catch (err) {
+        req.log.error(err)
+        return reply.code(500).send({ error: `创建目录失败：${err instanceof Error ? err.message : String(err)}` })
+      }
+      createdDir = true
+      probe = await probeDir(target) // 重建后重探（D2：新建目录按空目录初始化）
+    }
+    // 附加式规范化（D2）：empty 恒初始化四板块；needs-normalize 仅在确认后补缺失目录
+    const toCreate =
+      probe.verdict === 'empty'
+        ? [...BOARDS]
+        : probe.verdict === 'needs-normalize' && body.createMissing === true
+          ? (probe.missingBoards ?? [])
+          : []
+    for (const b of toCreate) {
+      try {
+        fs.mkdirSync(path.join(target, b), { recursive: true })
+      } catch (err) {
+        req.log.error(err)
+        return reply.code(500).send({ error: `创建板块目录 ${b} 失败：${err instanceof Error ? err.message : String(err)}` })
+      }
+    }
+    try {
+      persistNotesDir(target) // 仅写配置文件，本进程继续用旧目录（重启生效）
+    } catch (err) {
+      req.log.error(err)
+      return reply.code(500).send({ error: `保存配置失败：${err instanceof Error ? err.message : String(err)}` })
+    }
+    return {
+      ok: true,
+      ...(createdDir ? { createdDir } : {}),
+      createdBoards: toCreate,
+      dataDir: await getDataDirInfo(),
+    }
+  })
+
+  app.post('/api/data-dir/git/enable', async (req, reply) => {
+    if (!isLocalRequest(req)) return reply.code(403).send({ error: DATA_DIR_LOCAL_ONLY })
+    try {
+      return await enableGitTracking()
+    } catch (err) {
+      return replyDataDirError(req, reply, err, '启用版本跟踪失败')
+    }
   })
 
   // 标签注册表（v1.1 T1）：注册在 registerRoutes 内，LAN 切换重建实例后随本函数重注册

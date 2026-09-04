@@ -10,3 +10,6 @@ web/scripts/font-src/
 
 # 运行时导入的字体文件（F1，用户自担版权的二进制资产不入库；data/tags.json 仍跟踪）
 data/fonts/
+
+# 数据目录配置（G1）：机器特定绝对路径，缺失时回落仓库内 notes/
+data/app-settings.json
