@@ -1,9 +1,9 @@
 import { execFile } from 'node:child_process'
 import path from 'node:path'
-import { NOTES_DIR } from './scanner.js'
+import { getNotesDir } from './appConfig.js'
 
-/** 项目根目录（NOTES_DIR 上级），git 命令的工作目录 */
-const PROJECT_ROOT = path.resolve(NOTES_DIR, '..')
+/** 项目根目录（数据目录上级），git 命令的工作目录 */
+const PROJECT_ROOT = path.resolve(getNotesDir(), '..')
 
 /**
  * 删除词条后自动 git 提交（设计 2「版本管理：后台静默提交，误删可救」）：

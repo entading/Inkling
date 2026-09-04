@@ -11,8 +11,7 @@ import {
   type NoteWithBody,
   type NoteWithRaw,
 } from './types.js'
-
-export const NOTES_DIR = path.resolve(import.meta.dirname, '../../notes')
+import { getNotesDir } from './appConfig.js'
 
 /** 内存索引：板块 -> slug -> 词条 */
 const index = new Map<Board, Map<string, Note>>()
@@ -34,7 +33,7 @@ export function dateOfLocal(d: Date): string {
 }
 
 function boardOf(filePath: string): Board | null {
-  const rel = path.relative(NOTES_DIR, filePath)
+  const rel = path.relative(getNotesDir(), filePath)
   const relBoard = rel.split(path.sep)[0]
   return BOARDS.includes(relBoard as Board) ? (relBoard as Board) : null
 }
@@ -77,7 +76,7 @@ function parseNote(filePath: string): Note | null {
   const note: Note = {
     board,
     slug,
-    filePath: path.relative(NOTES_DIR, filePath),
+    filePath: path.relative(getNotesDir(), filePath),
     title: typeof data.data.title === 'string' && data.data.title.trim() ? data.data.title.trim() : slug,
     tags: Array.isArray(data.data.tags) ? data.data.tags.map(String) : [],
     created: createDateStr(data.data.created, created),
@@ -143,7 +142,7 @@ function scanDir(dir: string, slugMap: Map<string, Note>): void {
 /** 启动时全量扫描 */
 export function scanAll(): void {
   for (const board of BOARDS) {
-    const dir = path.join(NOTES_DIR, board)
+    const dir = path.join(getNotesDir(), board)
     const slugMap = new Map<string, Note>()
     index.set(board, slugMap)
     if (fs.existsSync(dir)) scanDir(dir, slugMap)
@@ -152,7 +151,7 @@ export function scanAll(): void {
 
 /** 监听 notes/ 增量更新；返回 watcher 以便关闭 */
 export function watch(delayMs = 150): FSWatcher {
-  const watcher = chokidar.watch(NOTES_DIR, {
+  const watcher = chokidar.watch(getNotesDir(), {
     ignoreInitial: true,
     awaitWriteFinish: {
       stabilityThreshold: delayMs,
@@ -174,7 +173,7 @@ function toPublic(note: Note): NotePublic {
 export function getNote(board: Board, slug: string): NoteWithBody | null {
   const note = index.get(board)?.get(slug)
   if (!note) return null
-  const raw = fs.readFileSync(path.join(NOTES_DIR, note.filePath), 'utf-8')
+  const raw = fs.readFileSync(path.join(getNotesDir(), note.filePath), 'utf-8')
   return { ...toPublic(note), body: parseFrontmatter(raw, note.filePath).content }
 }
 
@@ -182,7 +181,7 @@ export function getNote(board: Board, slug: string): NoteWithBody | null {
 export function getNoteRaw(board: Board, slug: string): NoteWithRaw | null {
   const note = index.get(board)?.get(slug)
   if (!note) return null
-  const raw = fs.readFileSync(path.join(NOTES_DIR, note.filePath), 'utf-8')
+  const raw = fs.readFileSync(path.join(getNotesDir(), note.filePath), 'utf-8')
   return { ...toPublic(note), body: parseFrontmatter(raw, note.filePath).content, raw }
 }
 
@@ -220,7 +219,7 @@ export function allNotesWithBody(): NoteWithBody[] {
  * 不依赖 chokidar 的 awaitWriteFinish 窗口，写完即刻可读（读接口 / 列表零延迟一致）。
  */
 export function writeNote(board: Board, slug: string, content: string): NoteWithBody {
-  const dir = path.join(NOTES_DIR, board)
+  const dir = path.join(getNotesDir(), board)
   fs.mkdirSync(dir, { recursive: true })
   const filePath = path.join(dir, `${slug}.md`)
   fs.writeFileSync(filePath, content, 'utf-8')
@@ -240,7 +239,7 @@ export function writeNote(board: Board, slug: string, content: string): NoteWith
 export function removeNote(board: Board, slug: string): void {
   const note = index.get(board)?.get(slug)
   if (!note) return
-  const filePath = path.join(NOTES_DIR, note.filePath)
+  const filePath = path.join(getNotesDir(), note.filePath)
   fs.rmSync(filePath)
   index.get(board)?.delete(slug)
 }
@@ -249,7 +248,7 @@ export function removeNote(board: Board, slug: string): void {
 export function noteFilePath(board: Board, slug: string): string | null {
   const note = index.get(board)?.get(slug)
   if (!note) return null
-  return path.join(NOTES_DIR, note.filePath)
+  return path.join(getNotesDir(), note.filePath)
 }
 
 /** 外部（标签手术）改写词条文件后立即重索引——不等 chokidar 的 awaitWriteFinish 窗口 */

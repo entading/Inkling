@@ -5,7 +5,7 @@ import fastifyStatic from '@fastify/static'
 
 import { registerRoutes } from './routes.js'
 import { scanAll, watch } from './scanner.js'
-import { NOTES_DIR } from './scanner.js'
+import { getNotesDir } from './appConfig.js'
 import { BOARD_LABELS } from './types.js'
 import {
   LAN_HOST,
@@ -98,7 +98,7 @@ async function start(): Promise<void> {
   app = buildApp()
   scanAll()
   watcher = watch()
-  console.log(`已扫描 notes/ 目录：${NOTES_DIR}`)
+  console.log(`已扫描数据目录：${getNotesDir()}`)
   await app.listen({ host: LOCAL_HOST, port: PORT })
   console.log(`Inkling 服务端已启动：http://localhost:${PORT}`)
   console.log(`板块：${Object.values(BOARD_LABELS).join('、')}`)

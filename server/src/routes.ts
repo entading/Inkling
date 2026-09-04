@@ -13,8 +13,8 @@ import {
   writeNote,
   removeNote,
   noteFilePath,
-  NOTES_DIR,
 } from './scanner.js'
+import { getNotesDir } from './appConfig.js'
 import { buildTemplate } from './templates.js'
 import { LAN_STATE, buildServerInfo } from './settings.js'
 import { commitNoteDeletion, commitNotesBatch } from './gitCommit.js'
@@ -80,8 +80,8 @@ function hasOwnTag(reg: Record<string, unknown>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(reg, key)
 }
 
-/** 项目根（git 工作目录）：notes/ 上一级 */
-const PROJECT_ROOT = path.resolve(NOTES_DIR, '..')
+/** 项目根（git 工作目录）：数据目录上一级（G1 §1.3 起改由 rev-parse 仓库根推导） */
+const PROJECT_ROOT = path.resolve(getNotesDir(), '..')
 
 /** 手术改写文件的 git 相对路径（posix 分隔符，供精确 git add） */
 function relForGit(absPath: string): string {

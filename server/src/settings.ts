@@ -1,7 +1,7 @@
 import os from 'node:os'
 import * as QRCode from 'qrcode'
 
-import { NOTES_DIR } from './scanner.js'
+import { getNotesDir } from './appConfig.js'
 
 export const LOCAL_HOST = '127.0.0.1'
 export const LAN_HOST = '0.0.0.0'
@@ -68,7 +68,7 @@ export async function buildServerInfo(lanEnabled: boolean): Promise<ServerInfo> 
     lanIps,
     urls,
     qrDataUrl,
-    notesDir: NOTES_DIR,
+    notesDir: getNotesDir(),
   }
 }
 
