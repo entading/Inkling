@@ -466,6 +466,9 @@ async function submitCreate(): Promise<void> {
   grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
   gap: var(--space-3);
   margin-bottom: var(--space-6);
+  /* 行内顶对齐不拉伸（UX 报障修复）：幽灵卡展开表单后自身远高于标签卡，
+     默认 stretch 会把同行标签卡一起撑高变形；幽灵卡自身用 align-self 恢复等高 */
+  align-items: start;
 }
 
 .hint,
@@ -600,16 +603,17 @@ async function submitCreate(): Promise<void> {
   border-radius: var(--radius-full);
 }
 
-/* 幽灵新建卡：虚线占位 → 点击原位展开表单；不设 min-height——Grid 行内默认
-   拉伸使其与同行标签卡等高（设了会撑高所在行，行高不一致） */
+/* 幽灵新建卡：虚线占位 → 点击原位展开表单。align-self:stretch 覆盖容器 start——
+   收起态仍与同行标签卡等高；展开态自身是行高来源（同行标签卡顶对齐不被拉伸） */
 .ghost-card {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: var(--space-3);
+  align-self: stretch;
   /* 与标签卡自然高度（卡头+托盘，81px）对齐：单独成行时不矮于其他行；
-     同行有标签卡时 Grid 拉伸本已等高。卡面结构变更时需同步此值 */
+     同行有标签卡时拉伸本已等高。卡面结构变更时需同步此值 */
   min-height: 81px;
   padding: var(--space-4);
   border: 1px dashed var(--color-border);
