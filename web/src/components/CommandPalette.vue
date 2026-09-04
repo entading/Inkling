@@ -206,7 +206,16 @@ watch(
   },
 )
 
+// 鼠标路径抑制滚动（用户报障修复）：@mousemove 扫过底缘裁切条目时 setActive 会
+// 触发 watch 的 scrollIntoView，把裁切条目完整滚入造成「离开面板异常下滚」。
+// 鼠标正看着该条目无需滚动——仅键盘导航（↑↓）与归零路径执行滚动跟随
+let suppressScroll = false
+
 watch(activeId, () => {
+  if (suppressScroll) {
+    suppressScroll = false
+    return
+  }
   void nextTick(() => {
     if (!activeId.value) return
     document
@@ -292,7 +301,10 @@ function onDocKeydownCapture(e: KeyboardEvent): void {
 
 function setActive(id: string): void {
   const idx = flatItems.value.findIndex((it) => it.id === id)
-  if (idx >= 0) activeIndex.value = idx
+  if (idx >= 0) {
+    suppressScroll = true
+    activeIndex.value = idx
+  }
 }
 
 onMounted(() => {
