@@ -62,15 +62,14 @@ function isUnregistered(tag: string): boolean {
 
 const registering = ref(false)
 const registerError = ref('')
-const justRegistered = ref(0)
 
 async function onRegisterCarried(): Promise<void> {
   if (registering.value) return
   registering.value = true
   registerError.value = ''
-  justRegistered.value = 0
   try {
-    justRegistered.value = (await registerCarriedTags()).length
+    // 成功反馈自解释：提示条随 unregisteredCarried 清零消失、卡片「未注册」徽标即时褪去
+    await registerCarriedTags()
   } catch (e) {
     registerError.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -250,9 +249,6 @@ async function submitCreate(): Promise<void> {
           {{ registering ? '注册中…' : `注册这 ${unregisteredCarried.length} 个标签` }}
         </button>
       </div>
-      <p v-else-if="justRegistered" class="carry-done" role="status">
-        已注册 {{ justRegistered }} 个标签（保留原显示色），切换数据目录后不再消失。
-      </p>
       <p v-if="registerError" class="error" role="alert">{{ registerError }}</p>
 
       <EmptyState
@@ -826,11 +822,5 @@ async function submitCreate(): Promise<void> {
 .carry-btn:disabled {
   opacity: 0.5;
   cursor: default;
-}
-
-.carry-done {
-  margin: 0 0 var(--space-4);
-  font-size: var(--text-xs);
-  color: var(--color-accent);
 }
 </style>
