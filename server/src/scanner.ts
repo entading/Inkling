@@ -115,6 +115,9 @@ function upsert(filePath: string): void {
 }
 
 function remove(filePath: string): void {
+  // unlink 对板块目录内所有文件触发（含图片等非 md 数据），仅 .md 才可能对应索引条目；
+  // 缺此守卫时「删 vocab/img.png + 存在 vocab/img.png.md」会把 slug=img.png 的词条误踢出索引
+  if (!filePath.endsWith('.md')) return
   const board = boardOf(filePath)
   if (!board) return
   const slugMap = index.get(board)
