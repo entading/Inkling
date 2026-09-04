@@ -242,7 +242,8 @@ export function registerRoutes(app: FastifyInstance, hooks?: ServerHooks): void 
     } catch (err) {
       return replyDataDirError(req, reply, err, '检查失败')
     }
-    if (probe.verdict === 'invalid') {
+    // invalid 但 canCreate（目录不存在）不放行 400——由下方 createDir 分支处理创建
+    if (probe.verdict === 'invalid' && !probe.canCreate) {
       return reply.code(400).send({ error: probe.reason ?? '目录不符合要求' })
     }
     if (probe.isCurrent) {
