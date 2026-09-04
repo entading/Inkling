@@ -36,18 +36,25 @@ npm run dev
 - **数据目录可切换**：设置页「数据目录」卡片可指定其他文件夹（自动检查目录状态，空目录一键初始化板块结构）；切换重启后生效，原目录文件原样保留可随时切回
 - **全局数据**（不随数据目录切换）：标签注册表 `data/tags.json`、导入字体 `data/fonts/`、应用配置 `data/app-settings.json`
 
-frontmatter 字段约定见 `AGENTS.md`「数据模型」。
+**frontmatter 约定**（`---` 围栏 YAML，全部字段可选，正文格式自由）：
+
+```markdown
+---
+title: abandon          # 词条标题，缺省 = 文件名
+ipa: /əˈbændən/         # 音标（词汇板渲染）
+tags: [cet6, 高频]       # 标签数组
+source: 真题 2024 Text 2 # 来源
+created: 2026-09-01     # 创建日期，缺省 = 文件创建时间
+updated: 2026-09-04     # 更新日期，缺省 = 文件修改时间
+---
+
+正文 Markdown……
+```
+
+显式写入的 `created`/`updated` 不会被自动更新；日期按所写值展示。
 
 ## 命令
 
 - `npm run dev`：启动服务端（tsx watch）与前端（vite）
 - `npm run build`：构建 server 与 web（类型检查 + 打包）
-
-## 文档
-
-- `AGENTS.md`：项目上下文（技术栈、数据模型、API 一览、关键实现约束）
-- `docs/`：各阶段归档
-  - `v1.0.0/`：v1 完整归档——产品设计方案、M1–M7 全维度测试报告、旧版 AGENTS
-  - `ui-refresh/`：UI/UX 焕新阶段——设计方案、M1'–M5' 实施记录、体验打磨台账
-  - `v1.1-tags/`：标签实体化——设计方案、T1/T2 实施记录
-  - `features/`：独立功能里程碑——F1 阅读字体管理器、G1 数据目录管理实施记录
+- `npm run build:fonts`：重新生成内置字体分片（日常无需使用）
