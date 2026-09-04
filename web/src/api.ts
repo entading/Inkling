@@ -45,6 +45,62 @@ export interface ServerInfo {
   notesDir: string
 }
 
+/** 数据目录 git 版本跟踪状态（G1） */
+export interface DataDirGitStatus {
+  tracked: boolean
+  root: string | null
+  hasCommits: boolean
+}
+
+/** 数据目录状态总览：GET /api/data-dir */
+export interface DataDirInfo {
+  notesDir: string
+  defaultNotesDir: string
+  isDefault: boolean
+  persistedDir: string
+  pendingRestart: boolean
+  configuredMissing: boolean
+  git: DataDirGitStatus
+}
+
+export type DataDirVerdict = 'empty' | 'ready' | 'needs-normalize' | 'invalid'
+
+/** 目录探测结果：POST /api/data-dir/check（verdict=invalid 时仅 reason/canCreate 可用） */
+export interface DataDirCheckResult {
+  path: string
+  verdict: DataDirVerdict
+  reason?: string
+  canCreate?: boolean
+  isCurrent?: boolean
+  isDefaultTarget?: boolean
+  missingBoards?: string[]
+  boards: Array<{ board: Board; mdCount: number; nonMdCount: number }>
+  looseRootMd: number
+  uppercaseMd: number
+  otherEntries: Array<{ name: string; isDir: boolean }>
+  fileCount: number
+  fileCountCapped?: boolean
+  nodeModulesPresent?: boolean
+  isDriveRoot?: boolean
+  git: DataDirGitStatus
+}
+
+/** 切换应用结果：只持久化配置，重启生效（D1） */
+export interface DataDirApplyResult {
+  ok: boolean
+  createdDir?: boolean
+  createdBoards: string[]
+  dataDir: DataDirInfo
+}
+
+/** 启用版本跟踪结果：committed=false 时携带 warning 说明 */
+export interface DataDirEnableResult {
+  ok: boolean
+  committed: boolean
+  warning?: string
+  git: DataDirGitStatus
+}
+
 /** 标签注册表单条目（v1.1）：color 为 0–7 色板索引 */
 export interface TagRegistryEntry {
   color: number
@@ -148,6 +204,25 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lanEnabled }),
     }),
+  /** 数据目录状态总览（G1，公开） */
+  dataDir: () => fetchJson<DataDirInfo>('/api/data-dir'),
+  /** 目录探测（仅本机，LAN 403） */
+  checkDataDir: (dirPath: string) =>
+    fetchJson<DataDirCheckResult>('/api/data-dir/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: dirPath }),
+    }),
+  /** 切换数据目录：仅持久化配置，重启生效（仅本机） */
+  applyDataDir: (dirPath: string, opts: { createMissing?: boolean; createDir?: boolean } = {}) =>
+    fetchJson<DataDirApplyResult>('/api/data-dir/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: dirPath, ...opts }),
+    }),
+  /** 当前生效目录启用版本跟踪：git init + 基线提交（仅本机） */
+  enableGitTracking: () =>
+    fetchJson<DataDirEnableResult>('/api/data-dir/git/enable', { method: 'POST' }),
   tags: () => fetchJson<TagRegistry>('/api/tags'),
   /** upsert：已存在仅更新颜色；响应为全量注册表 */
   upsertTag: (tag: string, color: number) =>

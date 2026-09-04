@@ -38,6 +38,8 @@ textarea {
   --color-border: #e5e7eb;
   --color-danger: #ef4444;
   --color-danger-soft: #fef2f2;
+  --color-warning: #b45309;
+  --color-warning-soft: #fef3c7;
   --color-on-accent: #ffffff;            /* 强调色实底上的文字 */
   /* 品牌标记渐变（UX 打磨）：高光蓝→accent 对角渐变，仅 .brand-mark 使用 */
   --gradient-brand: linear-gradient(135deg, #60a5fa, #3b82f6);
@@ -191,6 +193,8 @@ textarea {
   --color-border: #2a323c;
   --color-danger: #f87171;
   --color-danger-soft: rgba(248, 113, 113, 0.12);
+  --color-warning: #fbbf24;
+  --color-warning-soft: rgba(251, 191, 36, 0.12);
   /* 亮蓝实底（--color-accent 提亮后）上改用深字保证对比 */
   --color-on-accent: #0b1220;
   /* 品牌标记渐变深色变体：高光提到 300 档，暗底上保持醒目 */
