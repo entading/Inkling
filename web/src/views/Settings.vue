@@ -393,6 +393,13 @@ function toggleDdPanel(which: 'switch' | 'git'): void {
   if (which === 'switch') ddPathInput.value = ''
 }
 
+/** 完成按钮：收起面板并复位操作态（保存成功后的唯一退场路径） */
+function closeDdPanel(): void {
+  ddPanel.value = 'none'
+  resetDdOpState()
+  ddPathInput.value = ''
+}
+
 async function runCheck(): Promise<void> {
   const raw = ddPathInput.value.trim()
   if (!raw || ddChecking.value) return
@@ -997,15 +1004,19 @@ onMounted(load)
                   已保存。重启服务后生效，各设备刷新页面即可看到新数据。
                 </p>
                 <div class="dd-panel-actions">
-                  <button type="button" class="dd-btn" @click="toggleDdPanel('switch')">取消</button>
-                  <button
-                    type="button"
-                    class="dd-btn-primary"
-                    :disabled="!ddCanApply || ddApplying"
-                    @click="applyDataDir"
-                  >
-                    {{ ddApplying ? '切换中…' : '确认切换' }}
-                  </button>
+                  <!-- 保存成功后操作对退场，只留「完成」收尾——避免与已保存横幅同屏的可再点击假象 -->
+                  <template v-if="!ddApplied">
+                    <button type="button" class="dd-btn" @click="toggleDdPanel('switch')">取消</button>
+                    <button
+                      type="button"
+                      class="dd-btn-primary"
+                      :disabled="!ddCanApply || ddApplying"
+                      @click="applyDataDir"
+                    >
+                      {{ ddApplying ? '切换中…' : '确认切换' }}
+                    </button>
+                  </template>
+                  <button v-else type="button" class="dd-btn-primary" @click="closeDdPanel">完成</button>
                 </div>
               </template>
             </template>
@@ -1830,6 +1841,12 @@ onMounted(load)
   justify-content: flex-end;
   gap: var(--space-2);
   margin-top: var(--space-1);
+}
+
+/* 操作对等宽（取消/确认切换/完成），避免一宽一窄的失衡感 */
+.dd-panel-actions .dd-btn,
+.dd-panel-actions .dd-btn-primary {
+  min-width: 88px;
 }
 
 /* 按压反馈（§6）：全部新增动画统一包在 no-preference 内 */
