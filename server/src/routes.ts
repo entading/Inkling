@@ -14,7 +14,6 @@ import {
   removeNote,
   noteFilePath,
 } from './scanner.js'
-import { getNotesDir } from './appConfig.js'
 import { buildTemplate } from './templates.js'
 import { LAN_STATE, buildServerInfo } from './settings.js'
 import { commitNoteDeletion, commitNotesBatch } from './gitCommit.js'
@@ -80,14 +79,6 @@ function hasOwnTag(reg: Record<string, unknown>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(reg, key)
 }
 
-/** 项目根（git 工作目录）：数据目录上一级（G1 §1.3 起改由 rev-parse 仓库根推导） */
-const PROJECT_ROOT = path.resolve(getNotesDir(), '..')
-
-/** 手术改写文件的 git 相对路径（posix 分隔符，供精确 git add） */
-function relForGit(absPath: string): string {
-  return path.relative(PROJECT_ROOT, absPath).replace(/\\/g, '/')
-}
-
 interface TagOpWarning {
   board: string
   slug: string
@@ -96,17 +87,18 @@ interface TagOpWarning {
 
 /**
  * 对影响面词条逐个执行 frontmatter 手术：无法安全定位/读写 → 跳过并计入 warnings
- * （部分成功如实上报），成功者即时重索引并收集 git 精确提交路径。
+ * （部分成功如实上报），成功者即时重索引并收集 git 精确提交路径（绝对路径，
+ * 由 gitCommit 相对仓库根换算）。
  */
 function operateAffectedNotes(
   affected: Array<{ board: Board; slug: string }>,
   targetNfc: string,
   mode: 'remove' | 'rename',
   replacement: string,
-): { done: Array<{ board: string; slug: string }>; warnings: TagOpWarning[]; changedRel: string[] } {
+): { done: Array<{ board: string; slug: string }>; warnings: TagOpWarning[]; changedAbs: string[] } {
   const done: Array<{ board: string; slug: string }> = []
   const warnings: TagOpWarning[] = []
-  const changedRel: string[] = []
+  const changedAbs: string[] = []
   for (const n of affected) {
     const abs = noteFilePath(n.board, n.slug)
     if (!abs) {
@@ -116,12 +108,12 @@ function operateAffectedNotes(
     const res = surgeryNoteFile(abs, targetNfc, mode, replacement)
     if (res.ok) {
       done.push({ board: n.board, slug: n.slug })
-      changedRel.push(relForGit(abs))
+      changedAbs.push(abs)
     } else {
       warnings.push({ board: n.board, slug: n.slug, reason: res.reason })
     }
   }
-  return { done, warnings, changedRel }
+  return { done, warnings, changedAbs }
 }
 
 /** 写盘专用：在 isSafeSlug 基础上补 Windows 保留名与结尾点/空格（写这类文件名抛 EINVAL） */
@@ -244,7 +236,7 @@ export function registerRoutes(app: FastifyInstance, hooks?: ServerHooks): void 
     if (!inRegistry && affected.length === 0) {
       return reply.code(404).send({ error: `标签不存在：${tagNfc}` })
     }
-    const { done, warnings, changedRel } = operateAffectedNotes(affected, tagNfc, 'remove', '')
+    const { done, warnings, changedAbs } = operateAffectedNotes(affected, tagNfc, 'remove', '')
     if (inRegistry) {
       try {
         removeTagFromRegistry(tagNfc)
@@ -253,8 +245,8 @@ export function registerRoutes(app: FastifyInstance, hooks?: ServerHooks): void 
         return reply.code(500).send({ error: `注册表写入失败：${err instanceof Error ? err.message : String(err)}` })
       }
     }
-    if (changedRel.length > 0) {
-      commitNotesBatch(`note: 删除标签「${tagNfc}」（${done.length} 个词条移除）`, changedRel)
+    if (changedAbs.length > 0) {
+      commitNotesBatch(`note: 删除标签「${tagNfc}」（${done.length} 个词条移除）`, changedAbs)
     }
     return { registry: getTagRegistry(), removedFrom: done, warnings }
   })
@@ -293,7 +285,7 @@ export function registerRoutes(app: FastifyInstance, hooks?: ServerHooks): void 
       return reply.code(409).send({ error: `词条 ${conflict.board}/${conflict.slug} 已携带标签「${newNfc}」，合并请手工进行` })
     }
 
-    const { done, warnings, changedRel } = operateAffectedNotes(affected, oldNfc, 'rename', newNfc)
+    const { done, warnings, changedAbs } = operateAffectedNotes(affected, oldNfc, 'rename', newNfc)
     if (oldInRegistry) {
       try {
         renameTagInRegistry(oldNfc, newNfc)
@@ -302,8 +294,8 @@ export function registerRoutes(app: FastifyInstance, hooks?: ServerHooks): void 
         return reply.code(500).send({ error: `注册表写入失败：${err instanceof Error ? err.message : String(err)}` })
       }
     }
-    if (changedRel.length > 0) {
-      commitNotesBatch(`note: 标签重命名「${oldNfc}」→「${newNfc}」（${done.length} 个词条同步）`, changedRel)
+    if (changedAbs.length > 0) {
+      commitNotesBatch(`note: 标签重命名「${oldNfc}」→「${newNfc}」（${done.length} 个词条同步）`, changedAbs)
     }
     return { registry: getTagRegistry(), renamedNotes: done, warnings }
   })
