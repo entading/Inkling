@@ -54,6 +54,12 @@ const unregisteredCarried = computed(() =>
   tags.value.filter((t) => !Object.prototype.hasOwnProperty.call(registry.value, t.tag.normalize('NFC'))),
 )
 
+/** 卡头「未注册」徽标（方案 2 拍板）：词条携带但不在注册表——union 语义可见化，
+ * 点色板或批量注册后徽标即消失 */
+function isUnregistered(tag: string): boolean {
+  return !Object.prototype.hasOwnProperty.call(registry.value, tag.normalize('NFC'))
+}
+
 const registering = ref(false)
 const registerError = ref('')
 const justRegistered = ref(0)
@@ -280,7 +286,14 @@ async function submitCreate(): Promise<void> {
             </h3>
             <p class="card-meta">
               <span v-if="t.count === 0" class="card-badge">未使用</span>
-              <span v-else class="card-count">{{ t.count }} 条</span>
+              <template v-else>
+                <span class="card-count">{{ t.count }} 条</span>
+                <span
+                  v-if="isUnregistered(t.tag)"
+                  class="card-badge badge-unreg"
+                  title="仅存在于词条、未注册——切换数据目录会从本页消失；点色板或批量注册即可固化"
+                >未注册</span>
+              </template>
             </p>
           </div>
           <TagPalette
@@ -569,6 +582,12 @@ async function submitCreate(): Promise<void> {
   border-radius: var(--radius-full);
   opacity: 0.8;
   line-height: 1.6;
+}
+
+/* 「未注册」徽标（G1.5 方案 2）：虚线 + 更淡——与「未使用」实线徽标区分，hover 有因果说明 */
+.card-badge.badge-unreg {
+  border-style: dashed;
+  opacity: 0.6;
 }
 
 /* 色板行：色点直接排布于洗底（v1.1 迭代⑤回退方案 A 原设计），pulse 选中环缺口透出洗底 */
