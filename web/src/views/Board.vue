@@ -307,9 +307,11 @@ watch(() => route.query, syncFromRoute)
          updated 序使排序不可见（M5' 显隐决策，AZIndex 组件零改动）。短语板索引为 UX 打磨轮新增
          （用户拍板）；长难句/语法标题以中文/数字为主，字母索引无意义不开。
          条件用 effectiveSort（生效排序）而非 sort 原始 ref——短语板无 query 时 sort 为空串、
-         生效排序是 updated，用 sort 会出现「滑块在右索引却在」的分叉 -->
+         生效排序是 updated，用 sort 会出现「滑块在右索引却在」的分叉。
+         空板块（filtered 为空）不进索引分支——落到 NoteList 的「暂无词条 + 新建」空态，
+         否则字母序下只渲染一排全禁用的字母轨（UX 报障修复） -->
     <AZIndex
-      v-else-if="(board === 'vocab' || board === 'phrase') && effectiveSort !== 'updated'"
+      v-else-if="(board === 'vocab' || board === 'phrase') && effectiveSort !== 'updated' && filtered.length > 0"
       :notes="filtered"
     />
     <NoteList v-else :notes="filtered" />
