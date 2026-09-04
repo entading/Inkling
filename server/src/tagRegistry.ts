@@ -61,6 +61,31 @@ export function upsertTag(tag: string, color: number): TagRegistry {
 }
 
 /**
+ * 批量注册携带标签（G1.5 一键注册）：仅新增、绝不覆盖已有条目（color/created 原样
+ * 保留）；键 NFC 规范化 + 去重，__proto__/空白/超长/非法 color 兜底跳过（路由层已
+ * 校验，这里双保险）。整批一次原子写（先写盘后改内存）；返回实际新增的键列表。
+ */
+export function registerTagsBulk(items: Array<{ tag: string; color: number }>): { registered: string[] } {
+  const next: TagRegistry = { ...registry }
+  const registered: string[] = []
+  const seen = new Set<string>()
+  for (const { tag, color } of items) {
+    const key = tag.normalize('NFC')
+    if (!key || key.length > 32 || key === '__proto__') continue
+    if (!Number.isInteger(color) || color < 0 || color > 7) continue
+    if (seen.has(key) || Object.prototype.hasOwnProperty.call(next, key)) continue
+    seen.add(key)
+    next[key] = { color, created: dateOfLocal(new Date()) }
+    registered.push(key)
+  }
+  if (registered.length > 0) {
+    persist(next)
+    registry = next
+  }
+  return { registered }
+}
+
+/**
  * 移除注册表条目（v1.1 T2 深度删除的注册表侧）；不存在的键幂等返回现表。
  * 键必须为 NFC 形式（路由层归一）；判存走 hasOwnProperty（防原型链误判）。
  * 先写盘后改内存：写盘失败向上抛（路由转 500），内存保持与磁盘一致。

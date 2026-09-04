@@ -25,7 +25,7 @@ import {
 import { buildTemplate } from './templates.js'
 import { LAN_STATE, buildServerInfo } from './settings.js'
 import { commitNoteDeletion, commitNotesBatch } from './gitCommit.js'
-import { getTagRegistry, upsertTag, removeTagFromRegistry, renameTagInRegistry } from './tagRegistry.js'
+import { getTagRegistry, upsertTag, registerTagsBulk, removeTagFromRegistry, renameTagInRegistry } from './tagRegistry.js'
 import { surgeryNoteFile } from './tagSurgery.js'
 import {
   FONTS_DIR,
@@ -335,6 +335,39 @@ export function registerRoutes(app: FastifyInstance, hooks?: ServerHooks): void 
       return reply.code(500).send({ error: `写入失败：${err instanceof Error ? err.message : String(err)}` })
     }
     return getTagRegistry()
+  })
+
+  // 一键批量注册携带标签（G1.5）：前端聚合「当前词条携带且未注册」的标签，颜色取其
+  // 当前显示色（未注册=djb2 回落色，注册前后视觉零变化——哈希算法唯一来源保持在前端
+  // tagColor.ts，服务端不做第二份 hash）。服务端仅增量注册：已存在条目绝不覆盖
+  // （color/created 保留），整批一次原子写；写入失败 500 时内存未变。
+  app.post('/api/tags/register-carried', async (req, reply) => {
+    const body = req.body as { items?: unknown } | null | undefined
+    if (!body || !Array.isArray(body.items)) {
+      return reply.code(400).send({ error: 'body 必须为 { items: [{ tag, color }] }' })
+    }
+    const items: Array<{ tag: string; color: number }> = []
+    for (const it of body.items) {
+      const o = it as { tag?: unknown; color?: unknown } | null
+      if (!o || typeof o.tag !== 'string' || typeof o.color !== 'number') {
+        return reply.code(400).send({ error: 'items 元素必须为 { tag: string, color: number }' })
+      }
+      const tag = o.tag.trim()
+      if (!tag || tag.length > 32) {
+        return reply.code(400).send({ error: 'tag 不能为空白或超过 32 字符' })
+      }
+      if (!Number.isInteger(o.color) || o.color < 0 || o.color > 7) {
+        return reply.code(400).send({ error: 'color 必须为 0–7 的整数' })
+      }
+      items.push({ tag, color: o.color })
+    }
+    try {
+      const { registered } = registerTagsBulk(items)
+      return { registry: getTagRegistry(), registered }
+    } catch (err) {
+      req.log.error(err)
+      return reply.code(500).send({ error: `写入失败：${err instanceof Error ? err.message : String(err)}` })
+    }
   })
 
   // 标签深度删除（v1.1 T2）：注册表条目 + 全部携带词条 frontmatter 中的对应标签项一并移除。

@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { aggregateTags, type TagCount } from '../lib/search'
-import { tagRegistryRef, getTagRegistry, upsertTag } from '../lib/tagRegistry'
+import { tagRegistryRef, getTagRegistry, upsertTag, registerCarriedTags } from '../lib/tagRegistry'
 import { tagColorIndex } from '../lib/tagColor'
 import EmptyState from '../components/EmptyState.vue'
 import TagPalette from '../components/TagPalette.vue'
@@ -46,6 +46,31 @@ const unionTags = computed<TagCount[]>(() => {
     .map(([tag, count]) => ({ tag, count }))
     .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
 })
+
+// ---------- 一键注册携带标签（G1.5）：仅存在「词条携带但未注册」时出现提示条；
+// 同时向用户揭示 union 语义（携带标签随数据目录加载出现，注册后才目录无关常驻） ----------
+
+const unregisteredCarried = computed(() =>
+  tags.value.filter((t) => !Object.prototype.hasOwnProperty.call(registry.value, t.tag.normalize('NFC'))),
+)
+
+const registering = ref(false)
+const registerError = ref('')
+const justRegistered = ref(0)
+
+async function onRegisterCarried(): Promise<void> {
+  if (registering.value) return
+  registering.value = true
+  registerError.value = ''
+  justRegistered.value = 0
+  try {
+    justRegistered.value = (await registerCarriedTags()).length
+  } catch (e) {
+    registerError.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    registering.value = false
+  }
+}
 
 // ---------- 页面级筛选与排序（作用于色卡墙） ----------
 
@@ -208,6 +233,22 @@ async function submitCreate(): Promise<void> {
     <p v-if="error" class="error">加载失败：{{ error }}</p>
     <p v-else-if="loading" class="hint">加载中…</p>
     <template v-else>
+      <!-- 一键注册携带标签（G1.5）：时机化提示——只在确实存在未注册携带标签时出现 -->
+      <div v-if="unregisteredCarried.length" class="carry-hint">
+        <p class="carry-text">
+          当前有 {{ unregisteredCarried.length }} 个标签仅存在于词条、尚未注册（{{
+            unregisteredCarried.map((t) => t.tag).join('、')
+          }}）——切换数据目录后它们会从本页消失。
+        </p>
+        <button type="button" class="carry-btn" :disabled="registering" @click="onRegisterCarried">
+          {{ registering ? '注册中…' : `注册这 ${unregisteredCarried.length} 个标签` }}
+        </button>
+      </div>
+      <p v-else-if="justRegistered" class="carry-done" role="status">
+        已注册 {{ justRegistered }} 个标签（保留原显示色），切换数据目录后不再消失。
+      </p>
+      <p v-if="registerError" class="error" role="alert">{{ registerError }}</p>
+
       <EmptyState
         v-if="unionTags.length === 0"
         title="暂无标签"
@@ -706,7 +747,8 @@ async function submitCreate(): Promise<void> {
 @media (prefers-reduced-motion: no-preference) {
   .ghost-btn:active,
   .ghost-submit:active,
-  .ghost-cancel:active {
+  .ghost-cancel:active,
+  .carry-btn:active {
     transform: scale(0.98);
   }
 
@@ -720,5 +762,56 @@ async function submitCreate(): Promise<void> {
       transform: translateY(6px);
     }
   }
+}
+
+/* ---------- 一键注册携带标签提示条（G1.5） ---------- */
+
+.carry-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-accent-soft);
+  border-radius: var(--radius-md);
+}
+
+.carry-text {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+}
+
+.carry-btn {
+  flex: none;
+  padding: var(--space-1) var(--space-3);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  color: var(--color-accent);
+  background: var(--color-surface);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.carry-btn:hover:not(:disabled) {
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+}
+
+.carry-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.carry-done {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--color-accent);
 }
 </style>
