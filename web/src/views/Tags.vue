@@ -606,6 +606,7 @@ async function submitCreate(): Promise<void> {
 /* 幽灵新建卡：虚线占位 → 点击原位展开表单。align-self:stretch 覆盖容器 start——
    收起态仍与同行标签卡等高；展开态自身是行高来源（同行标签卡顶对齐不被拉伸） */
 .ghost-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -625,7 +626,14 @@ async function submitCreate(): Promise<void> {
   border-color: var(--color-accent);
 }
 
+/* 整卡热区（UX 打磨）：按钮绝对铺满虚线卡——点击卡内任意位置即展开表单；
+   键盘焦点/读屏语义仍是这一颗按钮（拉伸层同 NoteList 配方思路） */
 .ghost-btn {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: var(--space-2) var(--space-4);
   font-size: var(--text-sm);
   font-family: inherit;
