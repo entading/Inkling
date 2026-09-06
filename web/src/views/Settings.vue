@@ -74,6 +74,11 @@ const info = ref<ServerInfo | null>(null)
 const loading = ref(true)
 const error = ref('')
 
+/** 本机访问地址（服务状态卡）：优先取服务端 urls 里的 localhost 项，兜底拼端口 */
+const localUrl = computed(
+  () => info.value?.urls.find((u) => u.includes('localhost')) ?? `http://localhost:${info.value?.port ?? 3000}`,
+)
+
 // ---------- 阅读排版（F1）：纯前端偏好，三键 localStorage + 导入字体列表 ----------
 
 const fontPref = ref<ReadingFontPref>(getFontPreference())
@@ -1025,11 +1030,26 @@ onMounted(load)
       </section>
 
       <section class="card">
-        <h2 class="card-title">服务信息</h2>
+        <h2 class="card-title">服务状态</h2>
         <dl class="kv">
-          <div><dt>监听地址</dt><dd>{{ info.host }}:{{ info.port }}</dd></div>
-          <div><dt>访问地址</dt><dd>{{ info.urls.find(u => u.includes('localhost')) }}</dd></div>
+          <div>
+            <dt>本机访问</dt>
+            <dd>
+              <a :href="localUrl" target="_blank" rel="noopener" class="url-link">{{ localUrl }}</a>
+            </dd>
+          </div>
+          <div>
+            <dt>访问范围</dt>
+            <dd>{{ info.lanEnabled ? '本机与局域网（手机可扫码访问）' : '仅本机（手机暂不可访问）' }}</dd>
+          </div>
         </dl>
+        <p class="desc kv-hint">
+          {{
+            info.lanEnabled
+              ? '手机访问地址与二维码见上方「局域网访问」。'
+              : '开启上方「局域网访问」后，同一 Wi-Fi 下的手机即可访问。'
+          }}
+        </p>
       </section>
 
       <section v-if="ttsSupported" class="card">
@@ -1262,6 +1282,11 @@ onMounted(load)
 .kv dd {
   margin: 0;
   font-size: var(--text-base);
+}
+
+/* 服务状态卡的引导语：在 kv 下方（.desc 默认 margin-bottom 归零改上边距） */
+.kv-hint {
+  margin: var(--space-3) 0 0;
 }
 
 .tts-row {
