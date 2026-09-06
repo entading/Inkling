@@ -1059,13 +1059,10 @@ onMounted(load)
       <section v-if="ttsSupported" class="card">
         <h2 class="card-title">发音（TTS）</h2>
         <p class="desc">
-          词条朗读与选中朗读使用浏览器内置语音合成，默认美音（en-US）。
-          语音选择保存在当前浏览器，不同设备各自记忆。
+          词条朗读与选中朗读使用浏览器内置语音，偏好按浏览器各自记忆。
         </p>
         <p v-if="!hasNaturalVoice" class="desc tts-edge-tip">
-          提示：当前浏览器的语音为系统传统合成音。改用
-          <strong>Microsoft Edge</strong> 打开本应用，语音列表会出现
-          Windows 神经语音（Natural），音质明显更自然，无需任何配置。
+          提示：改用 <strong>Microsoft Edge</strong> 打开，可使用 Windows 神经语音（Natural），音质更好。
         </p>
         <div class="tts-row">
           <label class="tts-field">
