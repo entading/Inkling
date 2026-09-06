@@ -479,6 +479,10 @@ const voicesLoading = ref(ttsSupported)
 /** 空字符串 = 未指定（默认美音 en-US 兜底），与 tts.pickVoice 的回落语义一致 */
 const selectedVoiceName = ref('')
 
+/** Windows 神经语音（名称含 Natural）仅 Edge 的 speechSynthesis 独占：
+ * 语音库里有就不必再引导换浏览器（提示条按此隐藏） */
+const hasNaturalVoice = computed(() => voices.value.some((v) => /natural/i.test(v.name)))
+
 /** en-* 语音排前（排序稳定，组内保持系统顺序） */
 function sortVoices(list: SpeechSynthesisVoice[]): SpeechSynthesisVoice[] {
   return [...list].sort((a, b) => {
@@ -1057,6 +1061,11 @@ onMounted(load)
         <p class="desc">
           词条朗读与选中朗读使用浏览器内置语音合成，默认美音（en-US）。
           语音选择保存在当前浏览器，不同设备各自记忆。
+        </p>
+        <p v-if="!hasNaturalVoice" class="desc tts-edge-tip">
+          提示：当前浏览器的语音为系统传统合成音。改用
+          <strong>Microsoft Edge</strong> 打开本应用，语音列表会出现
+          Windows 神经语音（Natural），音质明显更自然，无需任何配置。
         </p>
         <div class="tts-row">
           <label class="tts-field">
