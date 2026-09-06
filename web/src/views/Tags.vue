@@ -257,13 +257,15 @@ async function submitCreate(): Promise<void> {
         description="给词条加上标签，或点击下方「＋ 新建标签」直接创建。"
       />
 
-      <!-- 色卡墙：union 全量标签。整卡 stretched-link 进详情，卡内色板点色即改 -->
+      <!-- 色卡墙：union 全量标签。整卡 stretched-link 进详情，卡内色板点色即改。
+           无标签且未筛选时也渲染（只出幽灵新建卡）——空态文案引导「点击下方
+           「＋ 新建标签」」，按钮缺席即死胡同空态（用户报障） -->
       <div
-        v-if="unionTags.length || formOpen"
+        v-if="!filter.trim() || unionTags.length || formOpen"
         class="card-wall"
         :class="{ 'stagger-arm': staggerArm }"
       >
-        <p v-if="filtered.length === 0" class="no-match">
+        <p v-if="filter.trim() && filtered.length === 0" class="no-match">
           没有匹配「{{ filter.trim() }}」的标签
         </p>
 
