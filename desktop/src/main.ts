@@ -1,8 +1,10 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
-import net from 'node:net'
+// 命名须避开 electron 的 net（Chromium 网络栈）：同名导入经 esbuild 会静默遮蔽 node:net，
+// 打包版 probePortFree 调 net.createServer 即炸（E2 打包验证实录）——勿改回 `import net`
+import nodeNet from 'node:net'
 import path from 'node:path'
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, net, shell, type MenuItemConstructorOptions } from 'electron'
 
 /**
  * Inkling Electron 主进程（E1 桌面化）。
@@ -27,6 +29,14 @@ const DEV_WEB_ORIGIN = 'http://localhost:5173'
 const DEV_SERVER_ORIGIN = 'http://localhost:3000'
 const READY_TIMEOUT_MS = 15_000
 
+/**
+ * 应用内检查更新（E2 S4）：更新源 manifest 地址是构建期常量，渲染端不可传入（无注入面）。
+ * null = 功能休眠（E2 默认形态）——仓库重建且公开后改此常量即激活，完整自动更新留 E3。
+ * latest.json 契约：{ "version": "1.4.0", "url": "<下载页 https URL>", "notes": "…" }
+ */
+const UPDATE_MANIFEST_URL: string | null = null
+const UPDATE_TIMEOUT_MS = 8000
+
 let mainWindow: BrowserWindow | null = null
 let serverChild: ChildProcess | null = null
 let serverPort = 0
@@ -45,7 +55,7 @@ function noteLog(line: string): void {
 
 function probePortFree(port: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const srv = net.createServer()
+    const srv = nodeNet.createServer()
     srv.once('error', () => resolve(false))
     srv.once('listening', () => srv.close(() => resolve(true)))
     srv.listen(port, '127.0.0.1')
@@ -54,7 +64,7 @@ function probePortFree(port: number): Promise<boolean> {
 
 function pickFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
-    const srv = net.createServer()
+    const srv = nodeNet.createServer()
     srv.once('error', reject)
     srv.listen(0, '127.0.0.1', () => {
       const addr = srv.address()
@@ -171,6 +181,18 @@ async function openWithDefault(url: string): Promise<{ ok: boolean; via: 'defaul
   return { ok: true, via: 'default' }
 }
 
+/** 外链打开唯一出口：协议白名单 http/https 校验 → 系统浏览器（will-navigate / windowOpenHandler / 右键菜单三处收敛） */
+function openExternalSafe(url: string): void {
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      void shell.openExternal(parsed.href)
+    }
+  } catch {
+    /* 非法 url 直接忽略 */
+  }
+}
+
 function openWithEdge(url: string): Promise<void> {
   return new Promise((resolve, reject) => {
     let child: ChildProcess
@@ -187,6 +209,28 @@ function openWithEdge(url: string): Promise<void> {
     child.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`msedge exit ${code}`))))
   })
 }
+
+/** 手写三段数字版本比较：candidate 是否严格新于 current（格式校验在调用方） */
+function isNewerVersion(candidate: string, current: string): boolean {
+  const seg = (v: string): [number, number, number] => {
+    const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(v)
+    return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [0, 0, 0]
+  }
+  const [cMaj, cMin, cPat] = seg(candidate)
+  const [uMaj, uMin, uPat] = seg(current)
+  if (cMaj !== uMaj) return cMaj > uMaj
+  if (cMin !== uMin) return cMin > uMin
+  return cPat > uPat
+}
+
+type UpdateCheckResult =
+  | { status: 'up-to-date' }
+  | { status: 'available'; version: string; url: string; notes?: string }
+  | { status: 'disabled' }
+  | { status: 'error' }
+
+/** 最近一次检查到的下载页地址：open-update-url 无参取用，杜绝渲染端传 URL 的注入面 */
+let lastUpdateUrl: string | null = null
 
 function registerIpc(): void {
   ipcMain.handle('desktop:open-external', (_event, url: unknown, target: unknown) => {
@@ -209,6 +253,58 @@ function registerIpc(): void {
         .catch(() => openWithDefault(parsed.href))
     }
     return openWithDefault(parsed.href)
+  })
+
+  // 检查更新（E2 S4）：net.fetch 走 Chromium 网络栈（系统代理生效）；形状校验 + 手写
+  // 三段版本比较，不引依赖。畸形响应一律 { status: 'error' }；版本非法按无更新处理并 warn。
+  ipcMain.handle('desktop:app-version', () => ({
+    version: app.getVersion(),
+    updateCheckEnabled: UPDATE_MANIFEST_URL !== null,
+  }))
+
+  ipcMain.handle('desktop:check-update', async (): Promise<UpdateCheckResult> => {
+    if (!UPDATE_MANIFEST_URL) return { status: 'disabled' }
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), UPDATE_TIMEOUT_MS)
+    try {
+      const res = await net.fetch(UPDATE_MANIFEST_URL, { cache: 'no-store', signal: controller.signal })
+      if (!res.ok) return { status: 'error' }
+      const data = (await res.json()) as { version?: unknown; url?: unknown; notes?: unknown }
+      if (typeof data.version !== 'string' || typeof data.url !== 'string') return { status: 'error' }
+      let download: URL
+      try {
+        download = new URL(data.url)
+      } catch {
+        return { status: 'error' }
+      }
+      if (download.protocol !== 'http:' && download.protocol !== 'https:') return { status: 'error' }
+      const remote = data.version.trim().replace(/^v/i, '')
+      if (!/^\d+\.\d+\.\d+$/.test(remote)) {
+        console.warn(`[update] manifest 版本格式非法（${data.version}），按无更新处理`)
+        return { status: 'up-to-date' }
+      }
+      if (isNewerVersion(remote, app.getVersion())) {
+        lastUpdateUrl = download.href
+        return {
+          status: 'available',
+          version: remote,
+          url: download.href,
+          notes: typeof data.notes === 'string' ? data.notes : undefined,
+        }
+      }
+      return { status: 'up-to-date' }
+    } catch {
+      return { status: 'error' }
+    } finally {
+      clearTimeout(timer)
+    }
+  })
+
+  // 前往下载：不收渲染端 URL，只开最近一次检查通过的下载页（openExternalSafe 再校验协议）
+  ipcMain.handle('desktop:open-update-url', () => {
+    if (!lastUpdateUrl) return { ok: false }
+    openExternalSafe(lastUpdateUrl)
+    return { ok: true }
   })
 }
 
@@ -237,7 +333,7 @@ function createWindow(origin: string): void {
   // deny 一切壳内新窗：target=_blank 一律不开新 Electron 窗，白名单 origin 交默认浏览器
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     try {
-      if (allowedOrigins().has(new URL(url).origin)) void shell.openExternal(url)
+      if (allowedOrigins().has(new URL(url).origin)) openExternalSafe(url)
     } catch {
       /* 非法 url 直接忽略 */
     }
@@ -257,9 +353,38 @@ function createWindow(origin: string): void {
     }
     if (allowedOrigins().has(parsed.origin)) return
     event.preventDefault()
-    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-      void shell.openExternal(url)
+    openExternalSafe(url)
+  })
+
+  // 壳内右键菜单（E2 S3）：可编辑元素（剪切/复制/粘贴/全选）、有选区（复制）、
+  // http(s) 链接（在浏览器打开链接）；无可操作项不弹（避免空菜单闪烁）。网页版零影响。
+  mainWindow.webContents.on('context-menu', (_event, params) => {
+    const items: MenuItemConstructorOptions[] = []
+    if (params.isEditable) {
+      items.push(
+        { role: 'cut', label: '剪切' },
+        { role: 'copy', label: '复制' },
+        { role: 'paste', label: '粘贴' },
+        { role: 'selectAll', label: '全选' },
+      )
+    } else if (params.selectionText) {
+      items.push({ role: 'copy', label: '复制' })
     }
+    if (params.linkURL) {
+      let isHttpLink = false
+      try {
+        const protocol = new URL(params.linkURL).protocol
+        isHttpLink = protocol === 'http:' || protocol === 'https:'
+      } catch {
+        /* 非 url 不给菜单项 */
+      }
+      if (isHttpLink) {
+        if (items.length > 0) items.push({ type: 'separator' })
+        items.push({ label: '在浏览器打开链接', click: () => openExternalSafe(params.linkURL) })
+      }
+    }
+    if (items.length === 0) return
+    Menu.buildFromTemplate(items).popup({ window: mainWindow ?? undefined })
   })
 
   void mainWindow.loadURL(origin)

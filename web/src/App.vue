@@ -4,9 +4,26 @@ import { RouterLink, RouterView, useRoute } from 'vue-router'
 import CommandPalette from './components/CommandPalette.vue'
 import FloatingActions from './components/FloatingActions.vue'
 import Icon, { type IconName } from './components/Icon.vue'
+import { isDesktop } from './lib/desktop'
+import { pingServer, serverOnline } from './lib/serverStatus'
 import { boardRoutes } from './router'
 
 const route = useRoute()
+
+// ---------- 服务断连横幅（E2）：api 层网络失败置离线，「重试」主动探测 ----------
+// 文案双态：桌面态引导重启应用，网页态引导确认桌面应用在运行（勿出现 host:port 措辞）
+
+const serverBannerText = isDesktop
+  ? '无法连接到 Inkling 服务，请重启应用'
+  : '无法连接到 Inkling 服务，请确认桌面应用是否在运行'
+
+const retrying = ref(false)
+
+async function retryConnection(): Promise<void> {
+  retrying.value = true
+  await pingServer()
+  retrying.value = false
+}
 
 /** 导航图标（§4）：侧栏与底部导航共用一份映射，颜色随 RouterLink 的 currentColor 变化 */
 const NAV_ICONS: Record<string, IconName> = {
@@ -39,7 +56,22 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
 </script>
 
 <template>
-  <div class="layout">
+  <div class="app-root">
+    <!-- 服务断连横幅（E2）：全局叠加信号，不替代各视图的 loading/error 态 -->
+    <div v-if="!serverOnline" class="server-banner" role="alert">
+      <span class="server-banner-dot" aria-hidden="true"></span>
+      <p class="server-banner-text">{{ serverBannerText }}</p>
+      <button
+        type="button"
+        class="server-banner-retry"
+        :disabled="retrying"
+        @click="retryConnection"
+      >
+        {{ retrying ? '重试中…' : '重试' }}
+      </button>
+    </div>
+
+    <div class="layout">
     <aside class="sidebar">
       <RouterLink to="/" class="brand">
         <span class="brand-mark">I</span>
@@ -127,13 +159,69 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
         <span>{{ r.label }}</span>
       </RouterLink>
     </nav>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.layout {
+.app-root {
   display: flex;
+  flex-direction: column;
   min-height: 100vh;
+}
+
+/* 服务断连横幅（E2）：全局叠加信号，in-flow 置于布局之上 */
+.server-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-warning-soft);
+  border-bottom: 1px solid var(--color-warning);
+}
+
+.server-banner-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-warning);
+}
+
+.server-banner-text {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.server-banner-retry {
+  flex: none;
+  margin-left: auto;
+  padding: var(--space-1) var(--space-3);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  color: var(--color-warning);
+  background: var(--color-surface);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.server-banner-retry:hover:not(:disabled) {
+  color: var(--color-on-accent);
+  background: var(--color-warning);
+}
+
+.server-banner-retry:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.layout {
+  flex: 1;
+  display: flex;
   background: var(--color-bg);
 }
 

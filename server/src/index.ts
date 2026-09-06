@@ -73,7 +73,14 @@ async function switchHost(enabled: boolean): Promise<void> {
   const old = app
   const next = buildApp()
   try {
-    await old?.close()
+    // 切换是管理动作、应答已先行返回，无需优雅排空——特定连接状态会让 close
+    // 挂起、新监听永不建立（E1 交付后诊断实录），故先清空连接再关，并加超时兜底。
+    // 超时后强行 listen 是安全的：close() 调用即停止接受新连接，挂起只是在等连接结束
+    old?.server.closeAllConnections?.()
+    const closing = old
+      ?.close()
+      .catch((err) => console.error('旧实例关闭异常：', err))
+    await Promise.race([closing, new Promise<void>((r) => setTimeout(r, 3000))])
     await next.listen({ host: to, port: PORT })
     app = next
     LAN_STATE.enabled = enabled

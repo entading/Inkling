@@ -39,7 +39,16 @@ import {
   saveVoiceName,
   speak,
 } from '../lib/tts'
-import { isDesktop, openInBrowser, openInEdge } from '../lib/desktop'
+import {
+  checkDesktopUpdate,
+  getDesktopAppInfo,
+  isDesktop,
+  openInBrowser,
+  openInEdge,
+  openUpdateDownload,
+  type DesktopAppInfo,
+  type DesktopUpdateResult,
+} from '../lib/desktop'
 
 // ---------- 外观（主题）：纯前端偏好，存 localStorage en_tool:theme，不走 /api/settings ----------
 
@@ -598,6 +607,33 @@ async function toggleLan() {
 }
 
 onMounted(load)
+
+// ---------- 关于卡（E2 S4）：桌面态版本展示 + 检查更新；更新源为主进程构建期常量，
+// 是否启用由壳告知（updateCheckEnabled），休眠形态仅显示版本 ----------
+
+const appVersionInfo = ref<DesktopAppInfo | null>(null)
+const updateChecking = ref(false)
+const updateResult = ref<DesktopUpdateResult | null>(null)
+
+async function onCheckUpdate(): Promise<void> {
+  updateChecking.value = true
+  updateResult.value = null
+  try {
+    updateResult.value = await checkDesktopUpdate()
+  } finally {
+    updateChecking.value = false
+  }
+}
+
+async function goDownloadUpdate(): Promise<void> {
+  const ok = await openUpdateDownload()
+  if (!ok) flashOpenHint('打开失败，请重试。')
+}
+
+onMounted(async () => {
+  // 网页态无桥返回 null，卡片不渲染
+  appVersionInfo.value = await getDesktopAppInfo()
+})
 </script>
 
 <template>
@@ -1132,6 +1168,30 @@ onMounted(load)
         </p>
       </section>
     </template>
+
+    <!-- 关于卡（E2 S4）：仅桌面态；置于服务信息块之外——服务断连时版本展示仍可用。
+         检查更新按钮仅在主进程配置了更新源（构建期常量）时出现，休眠形态只显示版本 -->
+    <section v-if="isDesktop && appVersionInfo" class="card">
+      <h2 class="card-title">关于</h2>
+      <p class="desc">Inkling 桌面版 v{{ appVersionInfo.version }}</p>
+      <template v-if="appVersionInfo.updateCheckEnabled">
+        <p v-if="updateResult?.status === 'available'" class="desc" role="status">
+          发现新版本 v{{ updateResult.version }}。
+          <button type="button" class="open-btn" @click="goDownloadUpdate">前往下载</button>
+        </p>
+        <p v-else-if="updateResult?.status === 'up-to-date'" class="desc" role="status">
+          已是最新版本。
+        </p>
+        <p v-else-if="updateResult?.status === 'error'" class="desc" role="alert">
+          检查更新失败，请确认网络后重试。
+        </p>
+        <div>
+          <button type="button" class="open-btn" :disabled="updateChecking" @click="onCheckUpdate">
+            {{ updateChecking ? '检查中…' : '检查更新' }}
+          </button>
+        </div>
+      </template>
+    </section>
   </div>
 </template>
 

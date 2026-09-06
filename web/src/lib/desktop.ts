@@ -10,8 +10,24 @@ export interface DesktopOpenResult {
   via?: 'default' | 'edge'
 }
 
+/** 关于卡（E2 S4）：版本 + 更新源是否已配置（manifest 为构建期常量，渲染端不可传入） */
+export interface DesktopAppInfo {
+  version: string
+  updateCheckEnabled: boolean
+}
+
+/** 检查更新结果（E2 S4）：disabled = 主进程未配置更新源（休眠形态） */
+export type DesktopUpdateResult =
+  | { status: 'up-to-date' }
+  | { status: 'available'; version: string; url: string; notes?: string }
+  | { status: 'disabled' }
+  | { status: 'error' }
+
 interface DesktopBridge {
   openExternal: (url: string, target?: 'default' | 'edge') => Promise<DesktopOpenResult>
+  appVersion?: () => Promise<DesktopAppInfo>
+  checkUpdate?: () => Promise<DesktopUpdateResult>
+  openUpdateUrl?: () => Promise<{ ok: boolean }>
 }
 
 declare global {
@@ -22,6 +38,37 @@ declare global {
 
 /** preload 先于页面脚本注入，模块加载期判定安全 */
 export const isDesktop = typeof window !== 'undefined' && !!window.desktop?.openExternal
+
+/** 桌面态版本信息（E2 S4）：无桥或旧壳缺方法时返回 null，关于卡不渲染 */
+export async function getDesktopAppInfo(): Promise<DesktopAppInfo | null> {
+  if (!window.desktop?.appVersion) return null
+  try {
+    return await window.desktop.appVersion()
+  } catch {
+    return null
+  }
+}
+
+/** 检查更新（E2 S4）：无桥时返回 null（网页态不出现该操作） */
+export async function checkDesktopUpdate(): Promise<DesktopUpdateResult | null> {
+  if (!window.desktop?.checkUpdate) return null
+  try {
+    return await window.desktop.checkUpdate()
+  } catch {
+    return { status: 'error' }
+  }
+}
+
+/** 前往下载（E2 S4）：主进程打开最近一次检查通过的下载页（URL 不经渲染端传递） */
+export async function openUpdateDownload(): Promise<boolean> {
+  if (!window.desktop?.openUpdateUrl) return false
+  try {
+    const res = await window.desktop.openUpdateUrl()
+    return !!res?.ok
+  } catch {
+    return false
+  }
+}
 
 /**
  * 用默认浏览器打开。网页形态回落 window.open（桌面入口只会隐藏，此分支仅防御性兜底）。

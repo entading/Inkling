@@ -1,4 +1,6 @@
 /** 与服务端 /api 对应的数据类型（见 server/src/types.ts） */
+import { setServerOnline } from './lib/serverStatus'
+
 export type Board = 'vocab' | 'phrase' | 'sentence' | 'grammar'
 
 export interface NoteMeta {
@@ -166,17 +168,30 @@ export class ApiError extends Error {
 }
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, init)
+  let res: Response
+  try {
+    res = await fetch(url, init)
+  } catch (err) {
+    // 网络层失败（连接拒绝/重置等）≠ ApiError（服务有响应）：全局断连信号置离线
+    setServerOnline(false)
+    throw err
+  }
   if (!res.ok) {
     let message = res.statusText
+    let hasJson = false
     try {
       const data = (await res.json()) as { error?: string }
+      hasJson = true
       if (data.error) message = data.error
     } catch {
       /* 忽略非 JSON 响应 */
     }
+    // 服务端 API 错误恒为统一 JSON；非 JSON 错误响应 = 代理层代答（dev 代理 502、服务未启动）
+    // → 同样视为断连。真服务端 4xx/5xx 仍是 JSON，不算断连
+    setServerOnline(hasJson)
     throw new ApiError(message, res.status)
   }
+  setServerOnline(true)
   return res.json() as Promise<T>
 }
 
