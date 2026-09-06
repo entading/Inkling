@@ -244,6 +244,24 @@ function createWindow(origin: string): void {
     return { action: 'deny' }
   })
 
+  // 同窗整页导航防护（设计 §5.1-5 未覆盖的路径）：markdown-it 默认外链不带 target=_blank，
+  // 点击会把窗口导航到外部网站且壳内无导航 UI 可返回。白名单 origin 放行（站内整页跳转），
+  // 外部 http(s) preventDefault 后交系统浏览器——收紧壳而非放宽 windowOpenHandler 白名单
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    let parsed: URL
+    try {
+      parsed = new URL(url)
+    } catch {
+      event.preventDefault()
+      return
+    }
+    if (allowedOrigins().has(parsed.origin)) return
+    event.preventDefault()
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      void shell.openExternal(url)
+    }
+  })
+
   void mainWindow.loadURL(origin)
 }
 
