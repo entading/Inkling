@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import Fuse from 'fuse.js'
 import Icon, { type IconName } from './Icon.vue'
 import { api, type Board, type NoteDetail, type NoteMeta } from '../api'
+import { isDesktop, openInBrowser } from '../lib/desktop'
 import { BOARD_LABELS, buildFuse, getSearchIndex, runFuse } from '../lib/search'
 import { useTheme } from '../lib/theme'
 
@@ -153,6 +154,21 @@ const actionItems = computed<PaletteItem[]>(() => [
     label: '设置',
     run: () => go('/settings'),
   },
+  // 桌面态专属（E1）：用默认浏览器打开当前应用；网页形态本就在浏览器中，不注册
+  ...(isDesktop
+    ? [
+        {
+          id: 'act-open-browser',
+          kind: 'action' as const,
+          icon: 'external-link' as const,
+          label: '在浏览器中打开',
+          run: () => {
+            emit('close')
+            void openInBrowser(window.location.origin)
+          },
+        },
+      ]
+    : []),
   themeAction.value,
 ])
 

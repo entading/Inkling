@@ -39,6 +39,7 @@ import {
   saveVoiceName,
   speak,
 } from '../lib/tts'
+import { isDesktop, openInBrowser, openInEdge } from '../lib/desktop'
 
 // ---------- 外观（主题）：纯前端偏好，存 localStorage en_tool:theme，不走 /api/settings ----------
 
@@ -78,6 +79,37 @@ const error = ref('')
 const localUrl = computed(
   () => info.value?.urls.find((u) => u.includes('localhost')) ?? `http://localhost:${info.value?.port ?? 3000}`,
 )
+
+// ---------- 浏览器入口（E1）：桌面态按钮组经主进程外开（origin 白名单校验在壳内）；
+// 网页态维持现状可点 URL。文案不带 host:port 技术措辞（ed2239d 约定） ----------
+
+/** Edge 缺失回落默认浏览器 / 打开失败的轻提示，数秒后自动消失 */
+const openHint = ref('')
+let openHintTimer: number | undefined
+
+function flashOpenHint(text: string): void {
+  openHint.value = text
+  if (openHintTimer !== undefined) window.clearTimeout(openHintTimer)
+  openHintTimer = window.setTimeout(() => {
+    openHint.value = ''
+    openHintTimer = undefined
+  }, 5000)
+}
+
+async function openWebIn(target: 'default' | 'edge'): Promise<void> {
+  if (!info.value) return
+  // 用页面自身 origin（dev=5173 / 桌面打包=实际端口），与命令面板行为一致；
+  // localUrl 在 dev 指向 3000（API 直连地址），不是壳窗口所在形态
+  const url = window.location.origin
+  if (target === 'default') {
+    const ok = await openInBrowser(url)
+    if (!ok) flashOpenHint('打开失败，请重试。')
+    return
+  }
+  const res = await openInEdge(url)
+  if (!res?.ok) flashOpenHint('打开失败，请重试。')
+  else if (res.via === 'default') flashOpenHint('未检测到 Edge，已改用默认浏览器打开。')
+}
 
 // ---------- 阅读排版（F1）：纯前端偏好，三键 localStorage + 导入字体列表 ----------
 
@@ -350,6 +382,7 @@ watch(
 
 onBeforeUnmount(() => {
   if (pollTimer !== undefined) window.clearInterval(pollTimer)
+  if (openHintTimer !== undefined) window.clearTimeout(openHintTimer)
 })
 
 /** 切换进行中：禁用开关，等待服务端后台完成 close→listen 后核对实际状态 */
@@ -1039,7 +1072,11 @@ onMounted(load)
           <div>
             <dt>本机访问</dt>
             <dd>
-              <a :href="localUrl" target="_blank" rel="noopener" class="url-link">{{ localUrl }}</a>
+              <span v-if="isDesktop" class="open-btns">
+                <button type="button" class="open-btn" @click="openWebIn('default')">在浏览器打开</button>
+                <button type="button" class="open-btn" @click="openWebIn('edge')">用 Edge 打开</button>
+              </span>
+              <a v-else :href="localUrl" target="_blank" rel="noopener" class="url-link">{{ localUrl }}</a>
             </dd>
           </div>
           <div>
@@ -1047,6 +1084,7 @@ onMounted(load)
             <dd>{{ info.lanEnabled ? '本机与局域网（手机可扫码访问）' : '仅本机（手机暂不可访问）' }}</dd>
           </div>
         </dl>
+        <p v-if="openHint" class="desc open-hint" role="status">{{ openHint }}</p>
         <p class="desc kv-hint">
           {{
             info.lanEnabled
@@ -1061,7 +1099,12 @@ onMounted(load)
         <p class="desc">
           词条朗读与选中朗读使用浏览器内置语音，偏好按浏览器各自记忆。
         </p>
-        <p v-if="!hasNaturalVoice" class="desc tts-edge-tip">
+        <!-- 桌面态：壳内无处可去，补直达按钮；网页态：维持现状引导文案 -->
+        <p v-if="!hasNaturalVoice && isDesktop" class="desc tts-edge-tip">
+          想要更自然的发音？用 Edge 打开网页版，可使用 Windows 神经语音（Natural）。
+          <button type="button" class="tts-edge-open" @click="openWebIn('edge')">用 Edge 打开</button>
+        </p>
+        <p v-else-if="!hasNaturalVoice" class="desc tts-edge-tip">
           提示：改用 <strong>Microsoft Edge</strong> 打开，可使用 Windows 神经语音（Natural），音质更好。
         </p>
         <div class="tts-row">
@@ -1295,6 +1338,65 @@ onMounted(load)
   margin: var(--space-3) 0 0;
 }
 
+/* —— 浏览器入口（E1）：桌面态按钮组与轻提示 —— */
+
+.open-btns {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.open-btn {
+  padding: var(--space-1) var(--space-3);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  background: var(--color-surface);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
+}
+
+.open-btn:hover {
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+}
+
+.open-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.open-hint {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+}
+
+.tts-edge-open {
+  padding: var(--space-1) var(--space-3);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  background: transparent;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
+}
+
+.tts-edge-open:hover {
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+}
+
+.tts-edge-open:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
 .tts-row {
   display: flex;
   align-items: center;
@@ -1370,7 +1472,9 @@ onMounted(load)
 
 /* 按压反馈（§6）：全部新增动画统一包在 no-preference 内 */
 @media (prefers-reduced-motion: no-preference) {
-  .tts-preview:active {
+  .tts-preview:active,
+  .open-btn:active,
+  .tts-edge-open:active {
     transform: scale(0.98);
   }
 }

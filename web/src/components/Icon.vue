@@ -36,6 +36,7 @@ const ICONS = {
   code: '<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>',
   quote: '<path d="M10 11H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4"/><path d="M20 11h-4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4"/>',
   wiki: '<path d="M9 4H4v16h5"/><path d="M15 4h5v16h-5"/><path d="M8 12h8"/>',
+  'external-link': '<path d="M18 13.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5.5"/><path d="M14 3.5h6.5V10"/><path d="M11.5 12.5 20.5 3.5"/>',
 } as const
 
 export type IconName = keyof typeof ICONS

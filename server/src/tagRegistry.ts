@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { GLOBAL_DATA_DIR } from './appConfig.js'
 import { dateOfLocal } from './scanner.js'
 
 /**
@@ -8,7 +9,7 @@ import { dateOfLocal } from './scanner.js'
  * 提交把注册表卷进笔记提交）。结构：{ "标签名": { color: 0-7, created } }。
  */
 
-export const REGISTRY_PATH = path.resolve(import.meta.dirname, '../../data/tags.json')
+export const REGISTRY_PATH = path.join(GLOBAL_DATA_DIR, 'tags.json')
 const REGISTRY_DIR = path.dirname(REGISTRY_PATH)
 
 export type TagRegistry = Record<string, { color: number; created: string }>

@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
+import { GLOBAL_DATA_DIR } from './appConfig.js'
 
 /**
  * 导入字体库（F1 阅读字体管理）：用户上传的字体文件经 cn-font-split 运行时分片后
@@ -18,7 +19,7 @@ import { randomBytes } from 'node:crypto'
  * 规避且不污染常驻服务主进程；任务经模块级 promise 队列串行化（同时上传多字体不并发切分）。
  */
 
-export const FONTS_DIR = path.resolve(import.meta.dirname, '../../data/fonts')
+export const FONTS_DIR = path.join(GLOBAL_DATA_DIR, 'fonts')
 const SPLIT_SCRIPT = path.resolve(import.meta.dirname, '../scripts/split-font.mjs')
 
 export type FontStatus = 'pending' | 'ready' | 'failed'

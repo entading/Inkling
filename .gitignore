@@ -20,7 +20,11 @@ data/app-settings.json
 docs/
 
 # 本地开发上下文（会话约束手册）
-AGENTS.md
+#AGENTS.md
 
 # 标签注册表：运行时用户数据（缺失即空表，应用自动重建）
 data/tags.json
+
+# 桌面版（E1）构建中间产物与安装包输出（desktop/server-lock.json 为装配锁，入库勿忽略）
+desktop/dist-app/
+desktop/release/

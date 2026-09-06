@@ -5,12 +5,15 @@
   "description": "个人英语学习知识沉淀库：Markdown 文件即数据，检索快、可互联",
   "workspaces": [
     "server",
-    "web"
+    "web",
+    "desktop"
   ],
   "scripts": {
     "dev": "concurrently -n server,web -c blue,green \"npm run dev -w server\" \"npm run dev -w web\"",
+    "dev:desktop": "concurrently -n server,web,desktop -c blue,green,magenta \"npm run dev -w server\" \"npm run dev -w web\" \"npm run dev -w desktop\"",
     "build": "npm run build -w server && npm run build -w web",
-    "build:fonts": "npm run build:fonts -w web"
+    "build:fonts": "npm run build:fonts -w web",
+    "build:desktop": "npm run build && npm run dist -w desktop"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

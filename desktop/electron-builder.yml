@@ -1,0 +1,31 @@
+appId: dev.inkling.desktop
+productName: Inkling
+# workspace 提升使 electron 不在 desktop/ 本地 node_modules，须显式固定版本（升级 electron 时同步改这里）
+electronVersion: 33.4.11
+directories:
+  app: dist-app
+  output: release
+# asar:false 勿改（设计方案 §3）：cn-font-split 原生 DLL、分片孙进程脚本、git 子进程
+# 全部按真实磁盘布局工作，杀掉一整类 asarUnpack/路径问题
+asar: false
+# staging 依赖已由 prepare-app.mjs 装配（koffi 为 napi 预编译），勿对原生模块做 electron-rebuild
+npmRebuild: false
+files:
+  - package.json
+  - main.cjs
+  - preload.cjs
+  - server/**/*
+  - web/dist/**/*
+# node_modules 整体直拷、绕开依赖树过滤（spike 实录：过滤会剥离 cn-font-split 包内
+# vendored 的 dist/node_modules/.pnpm → 分片子进程 require 失败）。prepare-app 收尾已把
+# staging package.json 改写为无 dependencies，此处是 node_modules 的唯一搬运通道。
+extraResources:
+  - from: dist-app/node_modules
+    to: app/node_modules
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: true
+  perMachine: false
+  deleteAppDataOnUninstall: false

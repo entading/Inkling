@@ -13,9 +13,19 @@ import path from 'node:path'
  *   目录恢复后下次重启自然生效）；配置损坏/非法 → 同样回落默认不拒启。
  */
 
-export const DEFAULT_NOTES_DIR = path.resolve(import.meta.dirname, '../../notes')
+/**
+ * 全局数据根（E1 桌面化）：注册表/应用设置/导入字体等「notes 之外的全局数据」的锚点。
+ * 桌面版经 env 注入 userData；dev/CLI 不设 env 时保持仓库根 data/ 原语义。
+ */
+export const GLOBAL_DATA_DIR = process.env.INKLING_GLOBAL_DATA_DIR
+  ? path.resolve(process.env.INKLING_GLOBAL_DATA_DIR)
+  : path.resolve(import.meta.dirname, '../../data')
 
-const APP_SETTINGS_PATH = path.resolve(import.meta.dirname, '../../data/app-settings.json')
+export const DEFAULT_NOTES_DIR = process.env.INKLING_GLOBAL_DATA_DIR
+  ? path.join(GLOBAL_DATA_DIR, 'notes')
+  : path.resolve(import.meta.dirname, '../../notes')
+
+const APP_SETTINGS_PATH = path.join(GLOBAL_DATA_DIR, 'app-settings.json')
 
 interface AppSettings {
   notesDir: string

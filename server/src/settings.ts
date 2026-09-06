@@ -5,7 +5,9 @@ import { getNotesDir } from './appConfig.js'
 
 export const LOCAL_HOST = '127.0.0.1'
 export const LAN_HOST = '0.0.0.0'
-export const PORT = 3000
+/** 桌面版经 INKLING_PORT 注入实际端口（3000 被占时主进程随机回落）；dev/CLI 不设 env 保持 3000 */
+const PORT_ENV = Number(process.env.INKLING_PORT)
+export const PORT = Number.isInteger(PORT_ENV) && PORT_ENV > 0 ? PORT_ENV : 3000
 
 /** 局域网开关不持久化：服务重启后默认关闭（设计 5.8「默认不开启」） */
 export const LAN_STATE = { enabled: false }

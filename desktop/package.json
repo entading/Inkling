@@ -1,0 +1,19 @@
+{
+  "name": "desktop",
+  "version": "1.2.0",
+  "private": true,
+  "description": "Inkling 桌面壳（E1）：Electron 主进程/preload 与打包装配",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "esbuild src/main.ts src/preload.ts --bundle --platform=node --external:electron --outdir=dist --out-extension:.js=.cjs",
+    "prepare-app": "node scripts/prepare-app.mjs",
+    "dist": "npm run build && npm run prepare-app && electron-builder --win",
+    "dev": "electron ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.25.0"
+  }
+}
