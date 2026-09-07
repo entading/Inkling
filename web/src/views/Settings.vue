@@ -42,11 +42,14 @@ import {
 import {
   checkDesktopUpdate,
   getDesktopAppInfo,
+  getDesktopSettings,
   isDesktop,
   openInBrowser,
   openInEdge,
   openUpdateDownload,
+  setDesktopSettings,
   type DesktopAppInfo,
+  type DesktopSettings,
   type DesktopUpdateResult,
 } from '../lib/desktop'
 
@@ -634,6 +637,41 @@ onMounted(async () => {
   // 网页态无桥返回 null，卡片不渲染
   appVersionInfo.value = await getDesktopAppInfo()
 })
+
+// ---------- 桌面卡（E3）：托盘驻留开关，主进程自有 tray-settings.json（不经服务端），
+// 落盘即生效（close handler 每次读内存态）。无桥/旧壳缺方法 → 卡不渲染 ----------
+
+const desktopSettings = ref<DesktopSettings | null>(null)
+const trayPending = ref(false)
+const trayError = ref('')
+
+onMounted(async () => {
+  desktopSettings.value = await getDesktopSettings()
+})
+
+async function onToggleCloseToTray(e: Event): Promise<void> {
+  const input = e.target as HTMLInputElement
+  if (!desktopSettings.value || trayPending.value) {
+    // 禁用窗口内的竞态点击：回弹到当前持久化值
+    input.checked = desktopSettings.value?.closeToTray ?? false
+    return
+  }
+  const target = input.checked
+  trayPending.value = true
+  trayError.value = ''
+  try {
+    const ok = await setDesktopSettings(target)
+    if (ok) {
+      desktopSettings.value = { closeToTray: target }
+    } else {
+      // 失败回弹：:checked 绑定值未变时 Vue 不重写 DOM，须显式恢复用户点击前的状态
+      input.checked = !target
+      trayError.value = '保存失败，请重试。'
+    }
+  } finally {
+    trayPending.value = false
+  }
+}
 </script>
 
 <template>
@@ -1168,6 +1206,28 @@ onMounted(async () => {
         </p>
       </section>
     </template>
+
+    <!-- 桌面卡（E3）：仅桌面态；托盘驻留开关走主进程 IPC，不依赖服务端数据 -->
+    <section v-if="isDesktop && desktopSettings" class="card">
+      <h2 class="card-title">桌面</h2>
+      <p class="desc">关闭窗口后 Inkling 将驻留系统托盘，从托盘图标可随时打开或退出。</p>
+      <div class="switch-row">
+        <label class="switch">
+          <input
+            type="checkbox"
+            aria-label="关闭窗口时最小化到托盘"
+            :checked="desktopSettings.closeToTray"
+            :disabled="trayPending"
+            @change="onToggleCloseToTray"
+          />
+          <span class="track"><span class="thumb" /></span>
+        </label>
+        <span class="switch-state">
+          {{ trayPending ? '保存中…' : desktopSettings.closeToTray ? '已开启' : '未开启' }}
+        </span>
+      </div>
+      <p v-if="trayError" class="error">{{ trayError }}</p>
+    </section>
 
     <!-- 关于卡（E2 S4）：仅桌面态；置于服务信息块之外——服务断连时版本展示仍可用。
          检查更新按钮仅在主进程配置了更新源（构建期常量）时出现，休眠形态只显示版本 -->

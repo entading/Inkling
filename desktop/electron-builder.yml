@@ -14,6 +14,7 @@ files:
   - package.json
   - main.cjs
   - preload.cjs
+  - tray-icon.png
   - server/**/*
   - web/dist/**/*
 # node_modules 整体直拷、绕开依赖树过滤（spike 实录：过滤会剥离 cn-font-split 包内

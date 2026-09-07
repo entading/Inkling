@@ -4,7 +4,19 @@ import { mkdirSync } from 'node:fs'
 // 打包版 probePortFree 调 net.createServer 即炸（E2 打包验证实录）——勿改回 `import net`
 import nodeNet from 'node:net'
 import path from 'node:path'
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, shell, type MenuItemConstructorOptions } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  net,
+  Notification,
+  shell,
+  Tray,
+  type MenuItemConstructorOptions,
+} from 'electron'
+import { getTraySettings, loadTraySettings, saveTraySettings } from './tray-settings'
 
 /**
  * Inkling Electron 主进程（E1 桌面化）。
@@ -38,6 +50,7 @@ const UPDATE_MANIFEST_URL: string | null = null
 const UPDATE_TIMEOUT_MS = 8000
 
 let mainWindow: BrowserWindow | null = null
+let tray: Tray | null = null
 let serverChild: ChildProcess | null = null
 let serverPort = 0
 let readyFulfilled = false
@@ -306,6 +319,82 @@ function registerIpc(): void {
     openExternalSafe(lastUpdateUrl)
     return { ok: true }
   })
+
+  // 桌面设置（E3）：主进程自有 tray-settings.json，不经服务端。get 只回渲染端需要的
+  // 字段（trayTipShown 是主进程内部态）；set 强校验 { closeToTray: boolean }，
+  // 落盘即生效（close handler 每次读内存态，无需重启）
+  ipcMain.handle('desktop:get-desktop-settings', () => ({ closeToTray: getTraySettings().closeToTray }))
+
+  ipcMain.handle('desktop:set-desktop-settings', (_event, patch: unknown) => {
+    if (typeof patch !== 'object' || patch === null) return { ok: false }
+    const { closeToTray } = patch as { closeToTray?: unknown }
+    if (typeof closeToTray !== 'boolean') return { ok: false }
+    try {
+      saveTraySettings(app.getPath('userData'), { closeToTray })
+    } catch (err) {
+      console.warn(`[tray-settings] 写盘失败：${err instanceof Error ? err.message : String(err)}`)
+      return { ok: false }
+    }
+    return { ok: true, closeToTray: getTraySettings().closeToTray }
+  })
+}
+
+// ---------- 托盘（E3）：app ready 后即创建，独立于窗口存在；dev 同样创建（主路径 dev 可验） ----------
+
+/** 窗口从隐藏/最小化恢复并置前（托盘单击/菜单与 second-instance 共用；steal 防 Windows 前台锁拦截） */
+function showMainWindow(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  app.focus({ steal: true })
+  mainWindow.focus()
+}
+
+function trayIconPath(): string {
+  // dev：main.cjs 在 desktop/dist/，图标源在 desktop/build/；prod：与 main.cjs 同目录（装配项）
+  return path.join(__dirname, IS_DEV ? '../build/tray-icon.png' : 'tray-icon.png')
+}
+
+function createTray(): void {
+  try {
+    tray = new Tray(trayIconPath())
+  } catch (err) {
+    // 图标缺失/损坏只降级托盘入口，不阻塞应用（关窗退回 E1 语义）
+    console.warn(`[tray] 托盘图标加载失败，托盘不可用：${err instanceof Error ? err.message : String(err)}`)
+    tray = null
+    return
+  }
+  tray.setToolTip(`Inkling v${app.getVersion()}`)
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: '打开 Inkling', click: () => showMainWindow() },
+      { label: '退出', click: () => app.quit() },
+    ]),
+  )
+  // Windows 左键单击：窗口隐藏时恢复置前，已可见时前置聚焦（右键走 context menu）
+  tray.on('click', () => showMainWindow())
+}
+
+/** 首次最小化到托盘的系统通知（Windows toast）：尽力而为，失败静默，不阻塞 hide */
+function notifyTrayOnce(): void {
+  if (!getTraySettings().trayTipShown) {
+    try {
+      if (Notification.isSupported()) {
+        new Notification({
+          title: 'Inkling 已最小化到托盘',
+          body: '从托盘图标可随时打开或退出',
+        }).show()
+      }
+    } catch {
+      /* 系统不支持/权限缺失：静默忽略 */
+    }
+    // 无论通知是否实际弹出都置位持久化——避免每次关窗都尝试弹失败的通知
+    try {
+      saveTraySettings(app.getPath('userData'), { trayTipShown: true })
+    } catch (err) {
+      console.warn(`[tray-settings] trayTipShown 持久化失败：${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
 }
 
 // ---------- 窗口（§5.1-4、5） ----------
@@ -329,6 +418,17 @@ function createWindow(origin: string): void {
   })
 
   mainWindow.once('ready-to-show', () => mainWindow?.show())
+
+  // 关窗拦截（E3 生命周期 A 语义）：三条关闭路径（X/Alt+F4/任务栏关闭）统一走 close 事件。
+  // quitting 守卫勿删——托盘「退出」→ app.quit() → before-quit 置位 → close 放行销毁；
+  // 没有它 close 拦截与 quit 互相死锁。closeToTray=false 时直接放行（E1 原语义不劣化）
+  mainWindow.on('close', (event) => {
+    if (!quitting && getTraySettings().closeToTray) {
+      event.preventDefault()
+      mainWindow?.hide()
+      notifyTrayOnce()
+    }
+  })
 
   // deny 一切壳内新窗：target=_blank 一律不开新 Electron 窗，白名单 origin 交默认浏览器
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -420,19 +520,16 @@ if (!gotLock) {
   app.quit()
 } else {
   app.on('second-instance', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      if (mainWindow.isMinimized()) mainWindow.restore()
-      mainWindow.show()
-      // Windows 前台锁会拦截后台进程的 show/focus（二次启动实测窗口不置前），steal 置前
-      app.focus({ steal: true })
-      mainWindow.focus()
-    }
+    // 对隐藏（托盘驻留）态天然兼容：show 即恢复；逻辑与托盘打开共用 showMainWindow
+    showMainWindow()
   })
 
   void app
     .whenReady()
     .then(() => {
+      loadTraySettings(app.getPath('userData'))
       registerIpc()
+      createTray()
       return startup()
     })
     .catch((err: unknown) => {

@@ -51,6 +51,14 @@ mkdirSync(distApp, { recursive: true })
 copyFileSync(path.join(desktopRoot, 'dist', 'main.cjs'), path.join(distApp, 'main.cjs'))
 copyFileSync(path.join(desktopRoot, 'dist', 'preload.cjs'), path.join(distApp, 'preload.cjs'))
 
+// 托盘图标（E3）：主进程 Tray 专用小尺寸资源，prod 从 main.cjs 同目录加载；
+// 缺失只降级托盘不可用，装配期直接报错拦住（避免打出托盘空白的包）
+const trayIconSrc = path.join(desktopRoot, 'build', 'tray-icon.png')
+if (!existsSync(trayIconSrc)) {
+  fail('缺少托盘图标 desktop/build/tray-icon.png：先运行 node scripts/gen-icon.mjs 渲染。')
+}
+copyFileSync(trayIconSrc, path.join(distApp, 'tray-icon.png'))
+
 // server/package.json 供 Node 判定 dist/*.js 的模块类型（"type":"module" 是 ESM dist 前提），
 // 其 dependencies 同时并入下方 app package.json 驱动依赖安装
 const serverPkg = JSON.parse(readFileSync(path.join(repoRoot, 'server', 'package.json'), 'utf8'))

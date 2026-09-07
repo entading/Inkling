@@ -23,11 +23,23 @@ export type DesktopUpdateResult =
   | { status: 'disabled' }
   | { status: 'error' }
 
+/** 桌面设置（E3）：主进程自有 tray-settings.json，trayTipShown 是主进程内部态不在此暴露 */
+export interface DesktopSettings {
+  closeToTray: boolean
+}
+
+export interface DesktopSetSettingsResult {
+  ok: boolean
+  closeToTray?: boolean
+}
+
 interface DesktopBridge {
   openExternal: (url: string, target?: 'default' | 'edge') => Promise<DesktopOpenResult>
   appVersion?: () => Promise<DesktopAppInfo>
   checkUpdate?: () => Promise<DesktopUpdateResult>
   openUpdateUrl?: () => Promise<{ ok: boolean }>
+  getDesktopSettings?: () => Promise<DesktopSettings>
+  setDesktopSettings?: (patch: { closeToTray: boolean }) => Promise<DesktopSetSettingsResult>
 }
 
 declare global {
@@ -64,6 +76,27 @@ export async function openUpdateDownload(): Promise<boolean> {
   if (!window.desktop?.openUpdateUrl) return false
   try {
     const res = await window.desktop.openUpdateUrl()
+    return !!res?.ok
+  } catch {
+    return false
+  }
+}
+
+/** 桌面设置（E3）：无桥（网页态）或旧壳缺方法时返回 null，「桌面」卡不渲染 */
+export async function getDesktopSettings(): Promise<DesktopSettings | null> {
+  if (!window.desktop?.getDesktopSettings) return null
+  try {
+    return await window.desktop.getDesktopSettings()
+  } catch {
+    return null
+  }
+}
+
+/** 保存桌面设置：主进程强校验 { closeToTray: boolean }，落盘即生效 */
+export async function setDesktopSettings(closeToTray: boolean): Promise<boolean> {
+  if (!window.desktop?.setDesktopSettings) return false
+  try {
+    const res = await window.desktop.setDesktopSettings({ closeToTray })
     return !!res?.ok
   } catch {
     return false
