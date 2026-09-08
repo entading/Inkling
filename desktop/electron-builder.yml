@@ -30,3 +30,10 @@ nsis:
   oneClick: true
   perMachine: false
   deleteAppDataOnUninstall: false
+# E4 更新通道：publish 仅为让本地构建产出 latest.yml + blockmap（应用内更新的版本索引，
+# 缺 yml 更新通道即瞎）；本地构建无 -p 永不上传——发布走 gh release create 手动上传
+# （流程见 README「维护者：发布」段）
+publish:
+  provider: github
+  owner: entading
+  repo: Inkling

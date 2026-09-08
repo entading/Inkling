@@ -10,18 +10,29 @@ export interface DesktopOpenResult {
   via?: 'default' | 'edge'
 }
 
-/** 关于卡（E2 S4）：版本 + 更新源是否已配置（manifest 为构建期常量，渲染端不可传入） */
+/** 关于卡（E4）：版本 + 更新通道可用性（通道为主进程构建期常量，渲染端不可传入） */
 export interface DesktopAppInfo {
   version: string
+  /** 更新功能可用（通道已配置且非 dev 形态）；false 时关于卡只显示版本 */
   updateCheckEnabled: boolean
+  updateChannel: 'github' | null
 }
 
-/** 检查更新结果（E2 S4）：disabled = 主进程未配置更新源（休眠形态） */
+/** 检查更新结果（保持 E2 契约形状，引擎已换 electron-updater）：disabled = 主进程未启用 */
 export type DesktopUpdateResult =
   | { status: 'up-to-date' }
-  | { status: 'available'; version: string; url: string; notes?: string }
+  | { status: 'available'; version: string; notes?: string }
   | { status: 'disabled' }
   | { status: 'error' }
+
+/** 更新事件（E4）：主进程 desktop:update-event 单通道推送，关于卡状态机的进度来源 */
+export type DesktopUpdateEvent =
+  | { type: 'checking' }
+  | { type: 'available'; version: string; notes?: string }
+  | { type: 'not-available' }
+  | { type: 'downloading'; percent: number }
+  | { type: 'downloaded'; version: string }
+  | { type: 'error'; message?: string }
 
 /** 桌面设置（E3）：主进程自有 tray-settings.json，trayTipShown 是主进程内部态不在此暴露 */
 export interface DesktopSettings {
@@ -37,9 +48,13 @@ interface DesktopBridge {
   openExternal: (url: string, target?: 'default' | 'edge') => Promise<DesktopOpenResult>
   appVersion?: () => Promise<DesktopAppInfo>
   checkUpdate?: () => Promise<DesktopUpdateResult>
+  downloadUpdate?: () => Promise<{ ok: boolean }>
+  installUpdate?: () => Promise<{ ok: boolean }>
   openUpdateUrl?: () => Promise<{ ok: boolean }>
   getDesktopSettings?: () => Promise<DesktopSettings>
   setDesktopSettings?: (patch: { closeToTray: boolean }) => Promise<DesktopSetSettingsResult>
+  /** 事件订阅：返回退订函数（旧壳缺方法时返回 no-op） */
+  onUpdateEvent?: (cb: (payload: DesktopUpdateEvent) => void) => () => void
 }
 
 declare global {
@@ -71,7 +86,39 @@ export async function checkDesktopUpdate(): Promise<DesktopUpdateResult | null> 
   }
 }
 
-/** 前往下载（E2 S4）：主进程打开最近一次检查通过的下载页（URL 不经渲染端传递） */
+/** 下载更新（E4 S1）：autoDownload=false，仅关于卡显式触发；进度走 onUpdateEvent 事件 */
+export async function downloadDesktopUpdate(): Promise<boolean> {
+  if (!window.desktop?.downloadUpdate) return false
+  try {
+    const res = await window.desktop.downloadUpdate()
+    return !!res?.ok
+  } catch {
+    return false
+  }
+}
+
+/** 安装并重启（E4 S1）：主进程随即退出并拉起安装器，装后自启；返回值仅防挂用途 */
+export async function installDesktopUpdate(): Promise<boolean> {
+  if (!window.desktop?.installUpdate) return false
+  try {
+    const res = await window.desktop.installUpdate()
+    return !!res?.ok
+  } catch {
+    return false
+  }
+}
+
+/** 订阅更新事件（E4 S1）：无桥或旧壳缺方法时返回 no-op 退订函数 */
+export function subscribeUpdateEvents(cb: (event: DesktopUpdateEvent) => void): () => void {
+  if (!window.desktop?.onUpdateEvent) return () => {}
+  try {
+    return window.desktop.onUpdateEvent(cb)
+  } catch {
+    return () => {}
+  }
+}
+
+/** 前往发布页（E2 S4 起次级路径）：主进程打开常量 Releases 页（URL 不经渲染端传递） */
 export async function openUpdateDownload(): Promise<boolean> {
   if (!window.desktop?.openUpdateUrl) return false
   try {

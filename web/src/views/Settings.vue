@@ -41,16 +41,19 @@ import {
 } from '../lib/tts'
 import {
   checkDesktopUpdate,
+  downloadDesktopUpdate,
   getDesktopAppInfo,
   getDesktopSettings,
+  installDesktopUpdate,
   isDesktop,
   openInBrowser,
   openInEdge,
   openUpdateDownload,
   setDesktopSettings,
+  subscribeUpdateEvents,
   type DesktopAppInfo,
   type DesktopSettings,
-  type DesktopUpdateResult,
+  type DesktopUpdateEvent,
 } from '../lib/desktop'
 
 // ---------- 外观（主题）：纯前端偏好，存 localStorage en_tool:theme，不走 /api/settings ----------
@@ -395,6 +398,8 @@ watch(
 onBeforeUnmount(() => {
   if (pollTimer !== undefined) window.clearInterval(pollTimer)
   if (openHintTimer !== undefined) window.clearTimeout(openHintTimer)
+  unsubscribeUpdate?.()
+  unsubscribeUpdate = null
 })
 
 /** 切换进行中：禁用开关，等待服务端后台完成 close→listen 后核对实际状态 */
@@ -611,31 +616,138 @@ async function toggleLan() {
 
 onMounted(load)
 
-// ---------- 关于卡（E2 S4）：桌面态版本展示 + 检查更新；更新源为主进程构建期常量，
-// 是否启用由壳告知（updateCheckEnabled），休眠形态仅显示版本 ----------
+// ---------- 关于卡（E4 S1）：electron-updater 完整引擎。检查结果以 IPC 返回值定状态，
+// 下载进度/完成/下载期错误经 desktop:update-event 单通道推送。状态机：
+// idle → checking → up-to-date | available → downloading → downloaded；error 可重试 ----------
 
 const appVersionInfo = ref<DesktopAppInfo | null>(null)
-const updateChecking = ref(false)
-const updateResult = ref<DesktopUpdateResult | null>(null)
+
+type UpdatePhase =
+  | 'idle'
+  | 'checking'
+  | 'up-to-date'
+  | 'available'
+  | 'downloading'
+  | 'downloaded'
+  | 'error'
+
+const updatePhase = ref<UpdatePhase>('idle')
+const updateVersion = ref('')
+const updateNotes = ref('')
+const downloadPercent = ref(0)
+const updateError = ref('')
+/** error 前最后动作（决定重试文案：检查失败 vs 下载失败） */
+const erroredFrom = ref<'check' | 'download'>('check')
+
+const CHECK_ERROR_TEXT = '检查更新失败，请确认网络后重试。'
+const DOWNLOAD_ERROR_TEXT = '下载失败，请确认网络后重试。'
+
+function enterCheckError(): void {
+  updatePhase.value = 'error'
+  erroredFrom.value = 'check'
+  updateError.value = CHECK_ERROR_TEXT
+}
 
 async function onCheckUpdate(): Promise<void> {
-  updateChecking.value = true
-  updateResult.value = null
+  if (updatePhase.value === 'checking' || updatePhase.value === 'downloading') return
+  updatePhase.value = 'checking'
+  updateError.value = ''
   try {
-    updateResult.value = await checkDesktopUpdate()
-  } finally {
-    updateChecking.value = false
+    const res = await checkDesktopUpdate()
+    if (res?.status === 'available') {
+      updateVersion.value = res.version
+      updateNotes.value = res.notes ?? ''
+      updatePhase.value = 'available'
+    } else if (res?.status === 'up-to-date') {
+      updatePhase.value = 'up-to-date'
+    } else if (res?.status === 'error') {
+      enterCheckError()
+    } else {
+      // disabled：按钮本应隐藏（updateCheckEnabled 门控），防御性归位
+      updatePhase.value = 'idle'
+    }
+  } catch {
+    enterCheckError()
   }
 }
 
-async function goDownloadUpdate(): Promise<void> {
+async function startDownload(): Promise<void> {
+  erroredFrom.value = 'download'
+  updatePhase.value = 'downloading'
+  downloadPercent.value = 0
+  const ok = await downloadDesktopUpdate()
+  // 下载成功时 update-downloaded 事件已先把状态推到 downloaded，勿覆盖；仅兜底失败
+  if (!ok && updatePhase.value === 'downloading') {
+    updatePhase.value = 'error'
+    updateError.value = DOWNLOAD_ERROR_TEXT
+  }
+}
+
+function onDownloadUpdate(): void {
+  if (updatePhase.value !== 'available') return
+  void startDownload()
+}
+
+async function onInstallUpdate(): Promise<void> {
+  if (updatePhase.value !== 'downloaded') return
+  // 主进程随即退出并拉起安装器（装后自启）；返回 false 的场景无需专门 UI
+  await installDesktopUpdate()
+}
+
+/** 失败重试统一回到检查动作（重新 available 后再点下载，路径最稳） */
+function onRetryUpdate(): void {
+  void onCheckUpdate()
+}
+
+function applyUpdateEvent(event: DesktopUpdateEvent): void {
+  switch (event.type) {
+    case 'checking':
+      // 渲染端发起检查时已置 checking，重复事件忽略
+      break
+    case 'available':
+    case 'not-available': {
+      // 已推进到下载/就绪阶段时防旧事件回退状态（如 downloaded 后再次检查的余波）
+      if (updatePhase.value === 'downloading' || updatePhase.value === 'downloaded') break
+      if (event.type === 'available') {
+        updateVersion.value = event.version
+        updateNotes.value = event.notes ?? ''
+        updatePhase.value = 'available'
+      } else {
+        updatePhase.value = 'up-to-date'
+      }
+      break
+    }
+    case 'downloading':
+      if (updatePhase.value === 'downloaded') break
+      updatePhase.value = 'downloading'
+      downloadPercent.value = event.percent
+      break
+    case 'downloaded':
+      if (event.version) updateVersion.value = event.version
+      downloadPercent.value = 100
+      updatePhase.value = 'downloaded'
+      break
+    case 'error':
+      // 检查期失败已由 IPC 返回值先行处置；下载期失败双保险兜底
+      if (updatePhase.value !== 'downloading') break
+      updatePhase.value = 'error'
+      updateError.value = DOWNLOAD_ERROR_TEXT
+      break
+  }
+}
+
+/** 前往发布页（次级路径）：主进程常量 Releases 页 */
+async function goReleasesPage(): Promise<void> {
   const ok = await openUpdateDownload()
   if (!ok) flashOpenHint('打开失败，请重试。')
 }
 
+let unsubscribeUpdate: (() => void) | null = null
+
 onMounted(async () => {
   // 网页态无桥返回 null，卡片不渲染
   appVersionInfo.value = await getDesktopAppInfo()
+  unsubscribeUpdate = subscribeUpdateEvents(applyUpdateEvent)
 })
 
 // ---------- 桌面卡（E3）：托盘驻留开关，主进程自有 tray-settings.json（不经服务端），
@@ -1229,25 +1341,73 @@ async function onToggleCloseToTray(e: Event): Promise<void> {
       <p v-if="trayError" class="error">{{ trayError }}</p>
     </section>
 
-    <!-- 关于卡（E2 S4）：仅桌面态；置于服务信息块之外——服务断连时版本展示仍可用。
-         检查更新按钮仅在主进程配置了更新源（构建期常量）时出现，休眠形态只显示版本 -->
+    <!-- 关于卡（E2 S4 起桌面态专属，E4 换 electron-updater 引擎）：置于服务信息块之外——
+         服务断连时版本展示与更新操作仍可用。检查按钮仅在 updateCheckEnabled 时出现 -->
     <section v-if="isDesktop && appVersionInfo" class="card">
       <h2 class="card-title">关于</h2>
       <p class="desc">Inkling 桌面版 v{{ appVersionInfo.version }}</p>
       <template v-if="appVersionInfo.updateCheckEnabled">
-        <p v-if="updateResult?.status === 'available'" class="desc" role="status">
-          发现新版本 v{{ updateResult.version }}。
-          <button type="button" class="open-btn" @click="goDownloadUpdate">前往下载</button>
+        <p v-if="updatePhase === 'checking'" class="desc" role="status">正在检查更新…</p>
+        <p v-else-if="updatePhase === 'up-to-date'" class="desc" role="status">已是最新版本。</p>
+        <template v-else-if="updatePhase === 'available'">
+          <p class="desc" role="status">发现新版本 v{{ updateVersion }}。</p>
+          <pre v-if="updateNotes" class="update-notes">{{ updateNotes }}</pre>
+        </template>
+        <p v-else-if="updatePhase === 'downloading'" class="desc" role="status">
+          正在下载更新… {{ downloadPercent }}%
         </p>
-        <p v-else-if="updateResult?.status === 'up-to-date'" class="desc" role="status">
-          已是最新版本。
+        <p v-else-if="updatePhase === 'downloaded'" class="desc" role="status">
+          v{{ updateVersion }} 已就绪，安装后应用会自动重启。
         </p>
-        <p v-else-if="updateResult?.status === 'error'" class="desc" role="alert">
-          检查更新失败，请确认网络后重试。
-        </p>
-        <div>
-          <button type="button" class="open-btn" :disabled="updateChecking" @click="onCheckUpdate">
-            {{ updateChecking ? '检查中…' : '检查更新' }}
+        <p v-else-if="updatePhase === 'error'" class="error" role="alert">{{ updateError }}</p>
+
+        <div
+          v-if="updatePhase === 'downloading'"
+          class="update-progress"
+          role="progressbar"
+          :aria-valuenow="downloadPercent"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-label="更新下载进度"
+        >
+          <div class="update-progress-fill" :style="{ width: `${downloadPercent}%` }" />
+        </div>
+
+        <div class="update-actions">
+          <button
+            v-if="updatePhase === 'idle' || updatePhase === 'up-to-date'"
+            type="button"
+            class="open-btn"
+            @click="onCheckUpdate"
+          >
+            检查更新
+          </button>
+          <button
+            v-if="updatePhase === 'available'"
+            type="button"
+            class="dd-btn dd-btn-primary"
+            @click="onDownloadUpdate"
+          >
+            下载并安装
+          </button>
+          <button
+            v-if="updatePhase === 'downloaded'"
+            type="button"
+            class="dd-btn dd-btn-primary"
+            @click="onInstallUpdate"
+          >
+            安装并重启
+          </button>
+          <button v-if="updatePhase === 'error'" type="button" class="open-btn" @click="onRetryUpdate">
+            重试
+          </button>
+          <button
+            v-if="updatePhase === 'available' || updatePhase === 'downloaded'"
+            type="button"
+            class="open-btn"
+            @click="goReleasesPage"
+          >
+            前往发布页
           </button>
         </div>
       </template>
@@ -1494,6 +1654,45 @@ async function onToggleCloseToTray(e: Event): Promise<void> {
   font-size: var(--text-sm);
 }
 
+/* —— 关于卡更新状态机（E4 S1）—— */
+
+/* Release notes 原文展示（纯文本 pre-wrap，不做 md 渲染），过高限高滚动 */
+.update-notes {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.update-progress {
+  height: 4px;
+  margin: 0 0 var(--space-3);
+  background: var(--color-surface-2);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.update-progress-fill {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: inherit;
+}
+
+.update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .tts-edge-open {
   padding: var(--space-1) var(--space-3);
   font-family: inherit;
@@ -1596,6 +1795,10 @@ async function onToggleCloseToTray(e: Event): Promise<void> {
   .open-btn:active,
   .tts-edge-open:active {
     transform: scale(0.98);
+  }
+
+  .update-progress-fill {
+    transition: width var(--duration-base) var(--ease-out);
   }
 }
 

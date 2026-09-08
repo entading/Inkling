@@ -10,12 +10,12 @@ import {
   dialog,
   ipcMain,
   Menu,
-  net,
   Notification,
   shell,
   Tray,
   type MenuItemConstructorOptions,
 } from 'electron'
+import { autoUpdater } from 'electron-updater'
 import { getTraySettings, loadTraySettings, saveTraySettings } from './tray-settings'
 
 /**
@@ -42,12 +42,18 @@ const DEV_SERVER_ORIGIN = 'http://localhost:3000'
 const READY_TIMEOUT_MS = 15_000
 
 /**
- * 应用内检查更新（E2 S4）：更新源 manifest 地址是构建期常量，渲染端不可传入（无注入面）。
- * null = 功能休眠（E2 默认形态）——仓库重建且公开后改此常量即激活，完整自动更新留 E3。
- * latest.json 契约：{ "version": "1.4.0", "url": "<下载页 https URL>", "notes": "…" }
+ * 应用内更新（E4 S1）：完整 electron-updater 引擎，更新通道是构建期常量，渲染端不可传入
+ * （无注入面，延续 E2 语义）。'github' = Release latest.yml 通道（仓库 entading/Inkling，
+ * 公开态是通道工作的硬前置——private Release 资产有 auth 门，updater 拉不到 latest.yml）；
+ * null = 休眠（不初始化 updater，IPC 返回 disabled）。dev 不初始化（electron-updater 在
+ * 未打包态直接抛错；本地接线测试走 dev-app-update.yml + forceDevUpdateConfig，见 §6.2）。
+ * 安全红线：autoDownload/autoInstallOnAppQuit 显式 false——下载与安装都只在用户于关于卡
+ * 显式点击后发生；GitHub API 匿名限流 60 次/时/IP，保持手动检查、勿做自动轮询。
  */
-const UPDATE_MANIFEST_URL: string | null = null
-const UPDATE_TIMEOUT_MS = 8000
+const UPDATE_CHANNEL: 'github' | null = 'github'
+const UPDATE_REPO = { owner: 'entading', repo: 'Inkling' }
+/** 「前往发布页」次级路径：恒定 Releases 页，经 openExternalSafe 打开（URL 不经渲染端传递） */
+const RELEASES_PAGE_URL = `https://github.com/${UPDATE_REPO.owner}/${UPDATE_REPO.repo}/releases/latest`
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -238,12 +244,80 @@ function isNewerVersion(candidate: string, current: string): boolean {
 
 type UpdateCheckResult =
   | { status: 'up-to-date' }
-  | { status: 'available'; version: string; url: string; notes?: string }
+  | { status: 'available'; version: string; notes?: string }
   | { status: 'disabled' }
   | { status: 'error' }
 
-/** 最近一次检查到的下载页地址：open-update-url 无参取用，杜绝渲染端传 URL 的注入面 */
+/** 更新事件（主进程 → 渲染端单通道 desktop:update-event）：关于卡状态机的唯一进度来源 */
+type UpdateEvent =
+  | { type: 'checking' }
+  | { type: 'available'; version: string; notes?: string }
+  | { type: 'not-available' }
+  | { type: 'downloading'; percent: number }
+  | { type: 'downloaded'; version: string }
+  | { type: 'error'; message?: string }
+
+/** 最近一次可用发布页地址：open-update-url 无参取用，杜绝渲染端传 URL 的注入面 */
 let lastUpdateUrl: string | null = null
+
+/** updater 是否已初始化（仅打包版；dev 与 UPDATE_CHANNEL=null 时保持 false，IPC 走 disabled） */
+let updaterActive = false
+
+function sendUpdateEvent(payload: UpdateEvent): void {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('desktop:update-event', payload)
+  }
+}
+
+/** releaseNotes 归一化：github provider 为字符串正文，条目数组形态按 note 拼合；空则 undefined */
+function notesOf(releaseNotes: unknown): string | undefined {
+  if (typeof releaseNotes === 'string' && releaseNotes.trim()) return releaseNotes.trim()
+  if (Array.isArray(releaseNotes)) {
+    const joined = releaseNotes
+      .map((it) =>
+        it && typeof it === 'object' && typeof (it as { note?: unknown }).note === 'string'
+          ? (it as { note: string }).note
+          : '',
+      )
+      .filter(Boolean)
+      .join('\n')
+      .trim()
+    return joined || undefined
+  }
+  return undefined
+}
+
+/**
+ * E4 S1：electron-updater 接线（仅打包版，dev 不初始化）。自动下载/退出自装显式关闭
+ * （负向清单红线）；updater 日志并入 logTail 环形缓冲（崩溃/就绪对话框附最近日志可诊断）。
+ */
+function initUpdater(): void {
+  if (UPDATE_CHANNEL !== 'github' || IS_DEV) return
+  autoUpdater.autoDownload = false
+  autoUpdater.autoInstallOnAppQuit = false
+  autoUpdater.logger = {
+    info: (message: unknown) => noteLog(`[updater] ${String(message)}`),
+    warn: (message: unknown) => noteLog(`[updater] ${String(message)}`),
+    error: (message: unknown) => noteLog(`[updater] ${String(message)}`),
+    debug: () => {},
+  }
+  autoUpdater.on('checking-for-update', () => sendUpdateEvent({ type: 'checking' }))
+  autoUpdater.on('update-available', (info) =>
+    sendUpdateEvent({ type: 'available', version: info.version, notes: notesOf(info.releaseNotes) }),
+  )
+  autoUpdater.on('update-not-available', () => sendUpdateEvent({ type: 'not-available' }))
+  autoUpdater.on('download-progress', (progress) =>
+    sendUpdateEvent({ type: 'downloading', percent: Math.round(progress.percent * 10) / 10 }),
+  )
+  autoUpdater.on('update-downloaded', (info) => sendUpdateEvent({ type: 'downloaded', version: info.version }))
+  autoUpdater.on('error', (err) => {
+    const message = err instanceof Error ? err.message : String(err)
+    noteLog(`[updater] error: ${message}`)
+    sendUpdateEvent({ type: 'error', message: message.slice(0, 200) })
+  })
+  lastUpdateUrl = RELEASES_PAGE_URL
+  updaterActive = true
+}
 
 function registerIpc(): void {
   ipcMain.handle('desktop:open-external', (_event, url: unknown, target: unknown) => {
@@ -268,52 +342,59 @@ function registerIpc(): void {
     return openWithDefault(parsed.href)
   })
 
-  // 检查更新（E2 S4）：net.fetch 走 Chromium 网络栈（系统代理生效）；形状校验 + 手写
-  // 三段版本比较，不引依赖。畸形响应一律 { status: 'error' }；版本非法按无更新处理并 warn。
+  // 检查更新（E4 S1）：autoUpdater 引擎映射回 E2 同形状结果；进度/完成经事件通道推送。
+  // 版本非法按无更新处理并 warn；异常（网络/限流/auth 门）一律 { status: 'error' }
   ipcMain.handle('desktop:app-version', () => ({
     version: app.getVersion(),
-    updateCheckEnabled: UPDATE_MANIFEST_URL !== null,
+    updateCheckEnabled: UPDATE_CHANNEL !== null && !IS_DEV,
+    updateChannel: UPDATE_CHANNEL,
   }))
 
   ipcMain.handle('desktop:check-update', async (): Promise<UpdateCheckResult> => {
-    if (!UPDATE_MANIFEST_URL) return { status: 'disabled' }
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), UPDATE_TIMEOUT_MS)
+    if (!updaterActive) return { status: 'disabled' }
     try {
-      const res = await net.fetch(UPDATE_MANIFEST_URL, { cache: 'no-store', signal: controller.signal })
-      if (!res.ok) return { status: 'error' }
-      const data = (await res.json()) as { version?: unknown; url?: unknown; notes?: unknown }
-      if (typeof data.version !== 'string' || typeof data.url !== 'string') return { status: 'error' }
-      let download: URL
-      try {
-        download = new URL(data.url)
-      } catch {
-        return { status: 'error' }
-      }
-      if (download.protocol !== 'http:' && download.protocol !== 'https:') return { status: 'error' }
-      const remote = data.version.trim().replace(/^v/i, '')
+      const result = await autoUpdater.checkForUpdates()
+      const remote = (result?.updateInfo?.version ?? '').trim().replace(/^v/i, '')
       if (!/^\d+\.\d+\.\d+$/.test(remote)) {
-        console.warn(`[update] manifest 版本格式非法（${data.version}），按无更新处理`)
+        console.warn(`[update] 远端版本格式非法（${remote}），按无更新处理`)
         return { status: 'up-to-date' }
       }
       if (isNewerVersion(remote, app.getVersion())) {
-        lastUpdateUrl = download.href
         return {
           status: 'available',
           version: remote,
-          url: download.href,
-          notes: typeof data.notes === 'string' ? data.notes : undefined,
+          notes: notesOf(result?.updateInfo?.releaseNotes),
         }
       }
       return { status: 'up-to-date' }
     } catch {
       return { status: 'error' }
-    } finally {
-      clearTimeout(timer)
     }
   })
 
-  // 前往下载：不收渲染端 URL，只开最近一次检查通过的下载页（openExternalSafe 再校验协议）
+  // 下载更新（E4 S1）：autoDownload=false，仅渲染端显式触发；进度经 download-progress 事件推送
+  ipcMain.handle('desktop:update-download', async () => {
+    if (!updaterActive) return { ok: false }
+    try {
+      await autoUpdater.downloadUpdate()
+      return { ok: true }
+    } catch {
+      return { ok: false }
+    }
+  })
+
+  // 安装并重启（E4 S1）：先置位 quitting 再 quitAndInstall——其内部走 app.quit，若 close
+  // 拦截（E3 closeToTray）先把窗口藏进托盘，安装器会等不到窗口销毁；置位后 close 直接放行。
+  // 非静默（安装过程可见）、装后自启
+  ipcMain.handle('desktop:update-install', () => {
+    if (!updaterActive) return { ok: false }
+    quitting = true
+    autoUpdater.quitAndInstall(false, true)
+    return { ok: true }
+  })
+
+  // 前往发布页：不收渲染端 URL，只开最近一次可用发布页（openExternalSafe 再校验协议）；
+  // updater 激活时常量预置，任何时刻可开
   ipcMain.handle('desktop:open-update-url', () => {
     if (!lastUpdateUrl) return { ok: false }
     openExternalSafe(lastUpdateUrl)
@@ -530,6 +611,7 @@ if (!gotLock) {
     .then(() => {
       loadTraySettings(app.getPath('userData'))
       registerIpc()
+      initUpdater()
       createTray()
       return startup()
     })

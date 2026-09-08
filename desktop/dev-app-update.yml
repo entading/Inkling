@@ -1,0 +1,5 @@
+# §6.2 dev 更新接线测试专用：electron-updater 在未打包态默认拒绝工作，需临时在 main.ts
+# 挂 forceDevUpdateConfig + 跳过 IS_DEV 守卫读取本文件（验证后必须还原，勿常态化开启）。
+# 指向 update-mock.mjs 本地静态服务（npm run dev 后台起：node scripts/update-mock.mjs <版本>）。
+provider: generic
+url: http://127.0.0.1:8787/updater/
