@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
+import { api } from './api'
 import CommandPalette from './components/CommandPalette.vue'
 import FloatingActions from './components/FloatingActions.vue'
 import Icon, { type IconName } from './components/Icon.vue'
@@ -23,6 +24,37 @@ async function retryConnection(): Promise<void> {
   retrying.value = true
   await pingServer()
   retrying.value = false
+}
+
+// ---------- 首启轻引导（E4 S2，向导取消后的替代）：桌面态 + 默认数据目录 + 四板块全空 +
+// 未关闭过才出现。App 级横幅保证任何路由可见；关闭持久化 localStorage（桌面态专属语义）。
+// 网页态零请求零渲染；桌面态条件不满足（已配目录/已有词条）也不出现 ----------
+
+const ONBOARDING_KEY = 'en_tool:desktop:onboarding-dismissed'
+
+function readOnboardingDismissed(): boolean {
+  try {
+    return localStorage.getItem(ONBOARDING_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+const onboardingDismissed = ref(readOnboardingDismissed())
+const onboardingIsDefault = ref(false)
+const onboardingAllEmpty = ref(false)
+
+const showOnboarding = computed(
+  () => isDesktop && !onboardingDismissed.value && onboardingIsDefault.value && onboardingAllEmpty.value,
+)
+
+function dismissOnboarding(): void {
+  onboardingDismissed.value = true
+  try {
+    localStorage.setItem(ONBOARDING_KEY, '1')
+  } catch {
+    /* 隐私模式等写入失败：仅本次会话生效 */
+  }
 }
 
 /** 导航图标（§4）：侧栏与底部导航共用一份映射，颜色随 RouterLink 的 currentColor 变化 */
@@ -51,7 +83,20 @@ function onGlobalKeydown(e: KeyboardEvent): void {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onGlobalKeydown))
+onMounted(() => {
+  window.addEventListener('keydown', onGlobalKeydown)
+  if (!isDesktop) return
+  // 轻引导条件探测：boards 计数 + 数据目录形态；任一失败则横幅不出现（断连另有全局信号）
+  void (async () => {
+    try {
+      const [boards, dd] = await Promise.all([api.boards(), api.dataDir().catch(() => null)])
+      onboardingAllEmpty.value = boards.every((b) => b.count === 0)
+      onboardingIsDefault.value = dd?.isDefault === true
+    } catch {
+      /* 服务不可达：不显示 */
+    }
+  })()
+})
 onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
 </script>
 
@@ -69,6 +114,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
       >
         {{ retrying ? '重试中…' : '重试' }}
       </button>
+    </div>
+
+    <!-- 首启轻引导（E4 S2）：条件全满足才出现（探测完成前不渲染，防闪烁）；去设置直达 -->
+    <div v-if="showOnboarding" class="onboard-banner" role="status">
+      <p class="onboard-text">
+        首次使用？在 设置 → 数据目录 选择你的笔记文件夹（支持 Obsidian 等已有 Markdown 目录）
+      </p>
+      <span class="onboard-actions">
+        <RouterLink to="/settings" class="onboard-go">去设置</RouterLink>
+        <button type="button" class="onboard-close" aria-label="关闭引导" @click="dismissOnboarding">
+          ×
+        </button>
+      </span>
     </div>
 
     <div class="layout">
@@ -217,6 +275,72 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
 .server-banner-retry:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* 首启轻引导（E4 S2）：与断连横幅同构（in-flow 置于布局之上），强调色系表达「可行动」 */
+.onboard-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-accent-soft);
+  border-bottom: 1px solid var(--color-accent);
+}
+
+.onboard-text {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.onboard-actions {
+  margin-left: auto;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.onboard-go {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition: opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.onboard-go:hover {
+  opacity: 0.88;
+}
+
+.onboard-close {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  font-size: var(--text-lg);
+  line-height: 1;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.onboard-close:hover {
+  color: var(--color-text);
+  background: var(--color-surface-2);
+}
+
+.onboard-close:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
 }
 
 .layout {
@@ -419,7 +543,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
   }
 
   .search-entry:active,
-  .new-entry:active {
+  .new-entry:active,
+  .onboard-go:active {
     transform: scale(0.98);
   }
 }
@@ -431,6 +556,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
 @media (max-width: 767px) {
   .sidebar {
     display: none;
+  }
+
+  .onboard-banner {
+    flex-wrap: wrap;
   }
 
   .content {
