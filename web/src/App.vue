@@ -119,7 +119,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
     <!-- 首启轻引导（E4 S2）：条件全满足才出现（探测完成前不渲染，防闪烁）；去设置直达 -->
     <div v-if="showOnboarding" class="onboard-banner" role="status">
       <p class="onboard-text">
-        首次使用？在 设置 → 数据目录 选择你的笔记文件夹（支持 Obsidian 等已有 Markdown 目录）
+        首次使用？可在 设置 → 数据目录 选择你的笔记文件夹（支持 Obsidian 等已有 Markdown 目录）
       </p>
       <span class="onboard-actions">
         <RouterLink to="/settings" class="onboard-go">去设置</RouterLink>
