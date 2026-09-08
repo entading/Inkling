@@ -421,9 +421,10 @@ function createWindow(origin: string): void {
 
   // 关窗拦截（E3 生命周期 A 语义）：三条关闭路径（X/Alt+F4/任务栏关闭）统一走 close 事件。
   // quitting 守卫勿删——托盘「退出」→ app.quit() → before-quit 置位 → close 放行销毁；
-  // 没有它 close 拦截与 quit 互相死锁。closeToTray=false 时直接放行（E1 原语义不劣化）
+  // 没有它 close 拦截与 quit 互相死锁。closeToTray=false 时直接放行（E1 原语义不劣化）；
+  // tray 在位守卫：托盘创建失败（图标缺失降级）时 hide 会令窗口无处可恢复，同样放行退回 E1
   mainWindow.on('close', (event) => {
-    if (!quitting && getTraySettings().closeToTray) {
+    if (!quitting && tray && getTraySettings().closeToTray) {
       event.preventDefault()
       mainWindow?.hide()
       notifyTrayOnce()
