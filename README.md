@@ -83,10 +83,10 @@ updated: 2026-09-04     # 更新日期，缺省 = 文件修改时间
 
 手动发布，不上 CI：
 
-1. 四处 `package.json` 同步 bump 版本（根 / `server/` / `web/` / `desktop/`——桌面版 version 即安装包与「关于」卡展示的版本）
+1. 四处 `package.json` 同步 bump 版本（根 / `server/` / `web/` / `desktop/`——桌面版 version 即安装包与「关于」卡展示的版本）并提交
 2. 仓库根执行 `npm run build:desktop`（本机链路依赖 winCodeSign 预置缓存与 npmmirror 镜像 env，见 docs/e1-electron/）
 3. 自测 `desktop/release/win-unpacked` 能正常启动
-4. `gh release create vX.Y.Z --target develop --notes "…"`，上传资产三件：`Inkling Setup X.Y.Z.exe`、`latest.yml`、`Inkling Setup X.Y.Z.exe.blockmap`（**缺 latest.yml 应用内更新通道即失效**）
+4. **先推送 develop**，再 `gh release create vX.Y.Z --target develop --notes "…"`（`--target` 解析的是远端分支，先推才能让 tag 指向正确提交），上传资产三件：`Inkling-Setup-X.Y.Z.exe`、`latest.yml`、`Inkling-Setup-X.Y.Z.exe.blockmap`（**资产名须与 latest.yml 内 url 一致（连字符形式），缺 latest.yml 应用内更新通道即失效**）
 5. 用旧版本应用内「检查更新」验证能发现新版本并完成升级
 
 ## License
