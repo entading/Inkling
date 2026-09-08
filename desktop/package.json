@@ -1,6 +1,6 @@
 {
   "name": "desktop",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
   "description": "Inkling 桌面壳（E1）：Electron 主进程/preload 与打包装配",
   "main": "dist/main.cjs",

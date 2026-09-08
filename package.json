@@ -1,6 +1,6 @@
 {
   "name": "inkling",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
   "license": "MIT",
   "description": "个人英语学习知识沉淀库：Markdown 文件即数据，检索快、可互联",
